@@ -166,33 +166,31 @@ class AdminController extends Controller
         return view('admin.loans', compact('loans', 'stats', 'items' ));
     }
 
-    public function updateLoan(HttpRequest $httpRequest, Loans $loan){
+    
+    public function updateLoan(HttpRequest $httpRequest, Loans $loan)
+    {
         $validated = $httpRequest->validate([
-            'hostname' => [
-                'nullable', 'string', 'max:255',
-            ],
-            'type' => [
-                'required', 'string', 'max:255',
-            ],
-            'sn' => [
-                'nullable', 'string', 'max:255',
-            ],
+            'hostname' => ['nullable', 'string', 'max:255'],
+            'type' => ['required', 'string', 'max:255'],
+            'sn' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $loan->update([
-            'hostname' =>
-                $validated['hostname'] ?? null,
-            'type' =>
-                $validated['type'],
-            'sn' =>
-                $validated['sn'] ?? null,
-        ]);
+        // Simpan hostname, type, dan serial number
+        $loan->hostname = $validated['hostname'] ?? null;
+        $loan->type = $validated['type'];
+        $loan->sn = $validated['sn'] ?? null;
+
+        // Set status menjadi selesai setelah Edit disimpan
+        $loan->status = 'selesai';
+
+        $loan->save();
 
         return back()->with(
             'success',
-            'Hostname, Type, and SN updated successfully.'
+            'Loan data updated and marked as completed successfully.'
         );
     }
+
 
     public function updateStatus(HttpRequest $httpRequest, Loans $loan)
     {

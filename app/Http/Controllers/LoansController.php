@@ -50,39 +50,39 @@ class LoansController extends Controller
     }
 
     public function store(Request $request)
-{
-    $validated = $request->validate([
-        'name' => 'required|string|max:100',
-        'email' => 'required|email|max:150',
-        'departement' => 'required|string|max:100',
-        'item_id' => 'required|exists:items,id',
-        'start_date' => 'required|date',
-        'others' => 'nullable|string',
-    ]);
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:150',
+            'departement' => 'required|string|max:100',
+            'item_id' => 'required|exists:items,id',
+            'start_date' => 'required|date',
+            'others' => 'nullable|string',
+        ]);
 
-    $item = Item::findOrFail($validated['item_id']);
+        $item = Item::findOrFail($validated['item_id']);
 
-    if ($item->available <= 0) {
-        return back()
-            ->withInput()
-            ->with('error', 'This item is currently unavailable.');
+        if ($item->available <= 0) {
+            return back()
+                ->withInput()
+                ->with('error', 'This item is currently unavailable.');
+        }
+
+        LoanRequest::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'departement' => $validated['departement'],
+            'item_id' => $item->id,
+            'start_date' => $validated['start_date'],
+            'others' => $validated['others'] ?? null,
+            'status' => 'pending',
+        ]);
+
+        return redirect()
+            ->route('guest.home')
+            ->with(
+                'success',
+                'Loan request sent successfully and is awaiting admin approval.'
+            );
     }
-
-    LoanRequest::create([
-        'name' => $validated['name'],
-        'email' => $validated['email'],
-        'departement' => $validated['departement'],
-        'item_id' => $item->id,
-        'start_date' => $validated['start_date'],
-        'others' => $validated['others'] ?? null,
-        'status' => 'pending',
-    ]);
-
-    return redirect()
-        ->route('guest.home')
-        ->with(
-            'success',
-            'Loan request sent successfully and is awaiting admin approval.'
-        );
-}
 }

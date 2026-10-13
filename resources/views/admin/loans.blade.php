@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', 'Loans Data')
@@ -5,6 +6,7 @@
 @section('content')
 
 <div class="dashboard">
+
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
         <h2 class="page-title" style="margin-bottom:0;">
             <i class="fas fa-list"></i>
@@ -25,7 +27,7 @@
 
         <div class="status-card selesai" onclick="filterStatus('selesai')" style="cursor:pointer;">
             <h4>{{ $stats['Done'] ?? 0 }}</h4>
-            <p><i class="fas fa-check-circle"></i> Done</p>
+            <p><i class="fas fa-check-circle"></i> Completed</p>
         </div>
 
         <div class="status-card" onclick="filterStatus('ditolak')" style="cursor:pointer;">
@@ -41,7 +43,8 @@
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="process">Process</option>
-                <option value="selesai">Done</option>
+                <option value="selesai">Completed</option>
+                <option value="ditolak">Rejected</option>
             </select>
 
             <select id="itemFilter" onchange="applyFilters()" style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; background:white;">
@@ -54,10 +57,11 @@
                 @endforeach
             </select>
 
-            <input type="text" id="searchFilter" placeholder="🔍 Search name/department/hostname..." oninput="applyFilters()" autocomplete="off" style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; min-width:260px;">
+            <input type="text" id="searchFilter" placeholder="Search name/department/hostname..." oninput="applyFilters()" autocomplete="off" style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; min-width:260px;">
 
             <button type="button" class="btn-outline" onclick="resetFilters()">
-                <i class="fas fa-undo"></i> Reset
+                <i class="fas fa-undo"></i>
+                Reset
             </button>
         </div>
 
@@ -65,7 +69,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>No</th>
+                        <th>No.</th>
                         <th>Name</th>
                         <th>Email</th>
                         <th>Department</th>
@@ -98,101 +102,89 @@
                                 ($loan->others ?? '')
                             ) }}"
                         >
-                            <td> {{ $no + 1 }} </td>
-                            <td> <strong>{{ $loan->name }}</strong> </td>
-                            <td> {{ $loan->email ?? '-' }} </td>
-                            <td> {{ $loan->departement }} </td>
-                            <td> {{ $loan->item->name ?? '-' }} </td>
-                            <td> {{ $loan->hostname ?? '-' }} </td>
-                            <td> {{ $loan->type ?? '-' }} </td>
-                            <td> {{ $loan->sn ?? '-' }} </td>
-                            <td> {{ $loan->others ?? '-' }} </td>
-                            <td> {{ $loan->start_date?->format('d/m/Y') ?? '-' }} </td>
+                            <td>{{ $no + 1 }}</td>
+
+                            <td>
+                                <strong>{{ $loan->name }}</strong>
+                            </td>
+
+                            <td>{{ $loan->email ?? '-' }}</td>
+
+                            <td>{{ $loan->departement ?? '-' }}</td>
+
+                            <td>{{ $loan->item->name ?? '-' }}</td>
+
+                            <td>{{ $loan->hostname ?? '-' }}</td>
+
+                            <td>{{ $loan->type ?? '-' }}</td>
+
+                            <td>{{ $loan->sn ?? '-' }}</td>
+
+                            <td>{{ $loan->others ?? '-' }}</td>
+
+                            <td>
+                                {{ $loan->start_date?->format('d/m/Y') ?? '-' }}
+                            </td>
+
                             <td>
                                 @if($loan->status === 'process')
-
                                     <span class="badge badge-info">
                                         Process
                                     </span>
 
                                 @elseif($loan->status === 'selesai')
-
                                     <span class="badge badge-success">
                                         Completed
                                     </span>
-                                @else
 
+                                @elseif($loan->status === 'ditolak')
+                                    <span class="badge badge-secondary">
+                                        Rejected
+                                    </span>
+
+                                @else
                                     <span class="badge badge-secondary">
                                         {{ ucfirst($loan->status) }}
                                     </span>
-
                                 @endif
                             </td>
 
                             <td>
-                                <div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap;">
-
-                                    <form
-                                        action="{{ route('admin.loans.update-status', $loan) }}"
-                                        method="POST"
-                                    >
-                                        @csrf
-                                        @method('PUT')
-
-                                        <select
-                                            name="status"
-                                            onchange="this.form.submit()"
-                                            style="padding:7px 9px; border:1px solid #ddd; border-radius:7px; background:white; cursor:pointer;"
-                                        >
-                                            <option
-                                                value="process"
-                                                {{ $loan->status === 'process' ? 'selected' : '' }}
-                                            >
-                                                Process
-                                            </option>
-
-                                            <option
-                                                value="selesai"
-                                                {{ $loan->status === 'selesai' ? 'selected' : '' }}
-                                            >
-                                                Completed
-                                            </option>
-                                        </select>
-                                    </form>
-
-                                    <button
-                                        type="button"
-                                        class="btn-table btn-warning"
-                                        onclick="openEditModal(
-                                            {{ $loan->id }},
-                                            @js($loan->name),
-                                            @js($loan->hostname),
-                                            @js($loan->type),
-                                            @js($loan->sn)
-                                        )"
-                                        title="Edit loan data"
-                                    >
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-
-                                </div>
+                                <button
+                                    type="button"
+                                    class="btn-table btn-warning"
+                                    onclick="openEditModal(
+                                        {{ $loan->id }},
+                                        @js($loan->name),
+                                        @js($loan->hostname),
+                                        @js($loan->type),
+                                        @js($loan->sn),
+                                        @js($loan->status)
+                                    )"
+                                    title="Edit loan data"
+                                >
+                                    <i class="fas fa-edit"></i>
+                                    Edit
+                                </button>
                             </td>
-
                         </tr>
 
                     @empty
-
                         <tr>
                             <td colspan="12" class="empty-state">
                                 <i class="fas fa-inbox"></i>
-
-                                <p>
-                                    No loan data yet.
-                                </p>
+                                <p>No loan data yet.</p>
                             </td>
                         </tr>
-
                     @endforelse
+
+                    {{-- No Filter Results --}}
+                    <tr id="noLoanResults" style="display:none;">
+                        <td colspan="12" class="empty-state">
+                            <i class="fas fa-search"></i>
+                            <p>No matching loan records found.</p>
+                        </td>
+                    </tr>
 
                 </tbody>
             </table>
@@ -201,128 +193,67 @@
 </div>
 
 
-{{-- EDIT MODAL --}}
-<div id="editModal" class="edit-modal">
-
-    <div class="edit-modal-content">
-
+<div id="editModal" class="edit-modal" aria-hidden="true">
+    <div class="edit-modal-content" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
         <div class="edit-modal-header">
-
             <div>
-                <h3>
+                <h3 id="editModalTitle">
                     <i class="fas fa-edit"></i>
                     Edit Loan Data
                 </h3>
-
                 <small id="editUserName"></small>
             </div>
 
-            <button
-                type="button"
-                onclick="closeEditModal()"
-                class="edit-modal-close"
-            >
+            <button type="button" onclick="closeEditModal()" class="edit-modal-close" aria-label="Close modal">
                 &times;
             </button>
-
         </div>
 
         <form id="editLoanForm" method="POST">
-
             @csrf
             @method('PUT')
 
             <div class="edit-modal-body">
 
                 <div class="edit-field">
-
-                    <label for="editHostname">
-                        Hostname
-                    </label>
-
-                    <input
-                        type="text"
-                        id="editHostname"
-                        name="hostname"
-                        maxlength="100"
-                        placeholder="Enter hostname"
-                    >
-
+                    <label for="editHostname">Hostname</label>
+                    <input type="text" id="editHostname" name="hostname" maxlength="100" placeholder="Enter hostname">
                 </div>
-
 
                 <div class="edit-field">
-
-                    <label for="editType">
-                        Type
-                    </label>
-
-                    <input
-                        type="text"
-                        id="editType"
-                        name="type"
-                        maxlength="50"
-                        placeholder="Example: Laptop / PC"
-                    >
-
+                    <label for="editType">Type</label>
+                    <input type="text" id="editType" name="type" maxlength="50" placeholder="Example: Laptop / PC">
                 </div>
-
 
                 <div class="edit-field">
-
-                    <label for="editSn">
-                        Serial Number (SN)
-                    </label>
-
-                    <input
-                        type="text"
-                        id="editSn"
-                        name="sn"
-                        maxlength="100"
-                        placeholder="Enter serial number"
-                    >
-
+                    <label for="editSn">Serial Number (SN)</label>
+                    <input type="text" id="editSn" name="sn" maxlength="100" placeholder="Enter serial number">
                 </div>
-
             </div>
-
 
             <div class="edit-modal-footer">
-
-                <button
-                    type="button"
-                    onclick="closeEditModal()"
-                    class="btn-outline"
-                >
+                <button type="button" onclick="closeEditModal()" class="btn-outline">
                     Cancel
                 </button>
-
-                <button
-                    type="submit"
-                    class="btn-table btn-success"
-                >
+                <button type="submit" id="saveLoanButton" class="btn-table btn-success">
                     <i class="fas fa-save"></i>
-                    Save
+                    Save & Complete
                 </button>
-
             </div>
-
         </form>
-
     </div>
-
 </div>
 
-
 <style>
-
 .edit-modal {
     display: none;
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(25, 35, 22, 0.52);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     z-index: 999999;
     align-items: center;
     justify-content: center;
@@ -330,29 +261,36 @@
     box-sizing: border-box;
 }
 
+.edit-modal.active {
+    display: flex;
+    animation: editFadeIn 0.2s ease;
+}
+
 .edit-modal-content {
+    box-sizing: border-box;
     width: 100%;
     max-width: 500px;
     max-height: calc(100vh - 40px);
-    background: #ffffff;
+    background: #fff;
+    border: 1px solid #edf0e8;
     border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
-    display: flex;
-    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+    animation: editSlideUp 0.25s ease;
 }
 
 .edit-modal-header {
     padding: 18px 20px;
-    border-bottom: 1px solid #eeeeee;
+    border-bottom: 1px solid #eee;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-shrink: 0;
+    gap: 12px;
 }
 
 .edit-modal-header h3 {
     margin: 0;
+    color: #526b36;
 }
 
 .edit-modal-header h3 i {
@@ -360,32 +298,32 @@
 }
 
 .edit-modal-header small {
-    color: #777777;
+    color: #777;
     display: block;
-    margin-top: 4px;
+    margin-top: 5px;
 }
 
 .edit-modal-close {
+    flex-shrink: 0;
     border: none;
     background: transparent;
     font-size: 28px;
     cursor: pointer;
     line-height: 1;
-    color: #555555;
+    color: #555;
     padding: 4px 8px;
 }
 
 .edit-modal-close:hover {
-    color: #222222;
+    color: #222;
 }
 
 .edit-modal-body {
     padding: 20px;
-    overflow-y: auto;
 }
 
 .edit-field {
-    margin-bottom: 15px;
+    margin-bottom: 16px;
 }
 
 .edit-field:last-child {
@@ -396,13 +334,14 @@
     display: block;
     font-weight: 600;
     margin-bottom: 6px;
+    color: #334155;
+    font-size: 13px;
 }
 
-.edit-field input,
-.edit-field textarea {
+.edit-field input {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid #dddddd;
+    border: 1px solid #ddd;
     border-radius: 8px;
     box-sizing: border-box;
     font-family: inherit;
@@ -410,42 +349,59 @@
     outline: none;
 }
 
-.edit-field input:focus,
-.edit-field textarea:focus {
+.edit-field input:focus {
     border-color: #8aa95a;
-    box-shadow: 0 0 0 2px rgba(138, 169, 90, 0.12);
+    box-shadow: 0 0 0 3px rgba(138, 169, 90, 0.12);
 }
 
-.edit-field textarea {
-    resize: vertical;
-    min-height: 90px;
-}
-
+/* Footer */
 .edit-modal-footer {
     padding: 15px 20px;
-    border-top: 1px solid #eeeeee;
+    border-top: 1px solid #eee;
     display: flex;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 10px;
-    flex-shrink: 0;
 }
 
-@media (max-width: 600px) {
+.edit-modal-footer button {
+    min-height: 38px;
+}
 
+.edit-modal-footer button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+/* Animations */
+@keyframes editFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes editSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
     .edit-modal {
         padding: 12px;
     }
 
     .edit-modal-content {
-        max-width: 100%;
         max-height: calc(100vh - 24px);
         border-radius: 12px;
     }
 
-    .edit-modal-header {
-        padding: 15px;
-    }
-
+    .edit-modal-header,
     .edit-modal-body {
         padding: 15px;
     }
@@ -454,115 +410,87 @@
         padding: 12px 15px;
     }
 
+    .edit-modal-footer button {
+        flex: 1;
+    }
 }
 
-@media (max-height: 600px) {
-
-    .edit-modal {
-        align-items: flex-start;
-        overflow-y: auto;
-        padding-top: 15px;
-        padding-bottom: 15px;
-    }
-
+@media (prefers-reduced-motion: reduce) {
+    .edit-modal.active,
     .edit-modal-content {
-        max-height: none;
+        animation: none;
     }
-
 }
-
 </style>
 
 
 <script>
-
 function applyFilters() {
+    const status = document.getElementById('statusFilter').value;
+    const item = document.getElementById('itemFilter').value;
 
-    const status =
-        document.getElementById('statusFilter').value;
+    const search = document
+        .getElementById('searchFilter')
+        .value
+        .toLowerCase()
+        .trim();
 
-    const item =
-        document.getElementById('itemFilter').value;
+    const rows = document.querySelectorAll('.loan-row');
+    let visibleCount = 0;
 
-    const search =
-        document.getElementById('searchFilter')
-            .value
-            .toLowerCase()
-            .trim();
+    rows.forEach(function (row) {
+        const rowStatus = row.dataset.status || '';
+        const rowItem = row.dataset.item || '';
+        const rowSearch = row.dataset.search || '';
 
-    document
-        .querySelectorAll('.loan-row')
-        .forEach(row => {
+        const statusMatch =
+            status === 'all' || rowStatus === status;
 
-            const rowStatus =
-                row.dataset.status || '';
+        const itemMatch =
+            item === 'all' || rowItem === item;
 
-            const rowItem =
-                row.dataset.item || '';
+        const searchMatch =
+            rowSearch.includes(search);
 
-            const rowSearch =
-                row.dataset.search || '';
+        const show =
+            statusMatch && itemMatch && searchMatch;
 
-            const statusMatch =
-                status === 'all' ||
-                rowStatus === status;
+        row.style.display = show ? '' : 'none';
 
-            const itemMatch =
-                item === 'all' ||
-                rowItem === item;
+        if (show) {
+            visibleCount++;
+        }
+    });
 
-            const searchMatch =
-                !search ||
-                rowSearch.includes(search);
+    const noResults = document.getElementById('noLoanResults');
 
-            row.style.display =
-                statusMatch &&
-                itemMatch &&
-                searchMatch
-                    ? ''
-                    : 'none';
-
-        });
+    if (noResults) {
+        noResults.style.display =
+            visibleCount === 0 ? '' : 'none';
+    }
 }
-
 
 function filterStatus(status) {
-
     document.getElementById('statusFilter').value = status;
-
     applyFilters();
-
 }
 
-
 function resetFilters() {
-
     document.getElementById('statusFilter').value = 'all';
-
     document.getElementById('itemFilter').value = 'all';
-
     document.getElementById('searchFilter').value = '';
 
     applyFilters();
-
 }
-
 
 const urlStatus =
     new URLSearchParams(window.location.search).get('status');
 
 if (
     urlStatus &&
-    [
-        'pending',
-        'process',
-        'selesai'
-    ].includes(urlStatus)
+    ['pending', 'process', 'selesai', 'ditolak'].includes(urlStatus)
 ) {
-
-    document.getElementById('statusFilter').value =
-        urlStatus;
-
+    document.getElementById('statusFilter').value = urlStatus;
 }
 
 applyFilters();
@@ -573,11 +501,14 @@ function openEditModal(
     userName,
     hostname,
     type,
-    sn
+    sn,
+    status
 ) {
+    const modal = document.getElementById('editModal');
+    const form = document.getElementById('editLoanForm');
 
     document.getElementById('editUserName').textContent =
-        'Peminjam: ' + userName;
+        'Borrower: ' + (userName || '-');
 
     document.getElementById('editHostname').value =
         hostname || '';
@@ -588,76 +519,52 @@ function openEditModal(
     document.getElementById('editSn').value =
         sn || '';
 
-    document.getElementById('editLoanForm').action =
-        `/admin/loans/${loanId}`;
+    form.action = `/admin/loans/${loanId}`;
 
-    document.getElementById('editModal').style.display =
-        'flex';
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
 
-    setTimeout(() => {
-
-        document
-            .getElementById('editHostname')
-            .focus();
-
+    setTimeout(function () {
+        document.getElementById('editHostname').focus();
     }, 100);
-
 }
-
 
 function closeEditModal() {
+    const modal = document.getElementById('editModal');
 
-    document.getElementById('editModal').style.display =
-        'none';
-
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
 }
 
-
-document
-    .getElementById('editModal')
-    .addEventListener(
-        'click',
-        function(event) {
-
-            if (event.target === this) {
-
-                closeEditModal();
-
-            }
-
-        }
-    );
-
-
-let currentLoanId = null;
-
-
-
-document.addEventListener(
-    'keydown',
-    function(event) {
-
-        if (event.key !== 'Escape') {
-
-            return;
-
-        }
-
-        const editModal =
-            document.getElementById('editModal');
-
-        if (
-            editModal &&
-            editModal.style.display === 'flex'
-        ) {
-
+document.getElementById('editModal').addEventListener(
+    'click',
+    function (event) {
+        if (event.target === this) {
             closeEditModal();
-
         }
-
     }
 );
 
-</script>  
+document.addEventListener('keydown', function (event) {
+    const modal = document.getElementById('editModal');
+
+    if (event.key === 'Escape' && modal.classList.contains('active')) {
+        closeEditModal();
+    }
+});
+
+document.getElementById('editLoanForm').addEventListener(
+    'submit',
+    function () {
+        const button = document.getElementById('saveLoanButton');
+
+        button.disabled = true;
+        button.innerHTML =
+            '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+);
+</script>
 
 @endsection

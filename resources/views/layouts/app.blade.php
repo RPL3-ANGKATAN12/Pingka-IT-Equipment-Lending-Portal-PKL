@@ -1,11 +1,11 @@
 {{-- resources/views/layouts/app.blade.php --}}
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>  
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Portal Laptop')</title>
+    <title>@yield('title', 'Laptop Portal')</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" >
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
@@ -237,7 +237,7 @@
                                 <i class="fas fa-envelope"></i>
                                 Email
                             </label>
-                            <input id="request_email" type="email" name="email" value="{{ old('email') }}" placeholder="Masukkan email aktif" required>
+                            <input id="request_email" type="email" name="email" value="{{ old('email') }}" placeholder="Enter your active email address" required>
                         </div>
                         <div class="form-group">
                             <label for="request_departement">
@@ -440,14 +440,14 @@
         function confirmLogout()
         {
             Swal.fire({
-                title: 'Logout dari akun?',
-                html: 'Kamu akan keluar dari akun<br>dan kembali ke halaman utama.',
+                title: 'Log out of your account?',
+                html: 'You will be logged out<br>and returned to the home page.',
                 icon: 'question',
                 showCancelButton: true,
                 reverseButtons: true,
                 focusCancel: true,
-                confirmButtonText: '<i class="fas fa-sign-out-alt"></i> Ya, Logout',
-                cancelButtonText: 'Batal',
+                confirmButtonText: '<i class="fas fa-sign-out-alt"></i> Yes, Log Out',
+                cancelButtonText: 'Cancel',
                 customClass: {
                     popup: 'logout-popup',
                     title: 'logout-title',

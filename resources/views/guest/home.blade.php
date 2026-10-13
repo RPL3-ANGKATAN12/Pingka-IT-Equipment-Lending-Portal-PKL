@@ -16,7 +16,6 @@
         </p>
 
         <div class="home-buttons">
-
             <a href="{{ route('guest.items') }}" class="home-button">
                 <div class="button-icon">📦</div>
 
@@ -38,12 +37,7 @@
                     </span>
                 </div>
             </a>
-
         </div>
-
     </div>
-
 </div>
-
-
 @endsection

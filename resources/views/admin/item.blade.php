@@ -108,7 +108,7 @@
                 <div class="form-group" style="margin-top: 1rem;">
                     <label><i class="fas fa-boxes"></i> Available</label>
                     <input type="number" name="available" min="0" value="0" required style="width: 100%; padding: 12px; border: 2px solid #e8e8ed; border-radius: 8px;">
-                    <small style="color: #6B7B6B;">Enter jumlah item yang tersedia.</small>
+                    <small style="color: #6B7B6B;">Enter the number of available items.</small>
                 </div>  
             </div>
             <div class="modal-footer" style="padding: 1rem 1.5rem 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
@@ -143,7 +143,7 @@
                 <input type="text" id="editItemName" name="name" placeholder="Example: Laptop, Computer, Printer..." required style=" width: 100%; padding: 12px; border: 2px solid #E8E8ED; border-radius: 8px; font-size: 16px; margin-top: 8px;">
 
                 <small style="color: #6B7B6B;">
-                    Enter name item yang baru.
+                    Enter the name of the new item.
                 </small>
             </div>
 
@@ -153,7 +153,7 @@
                 </label>
                 <input type="number" id="editItemAvailable" name="available" min="0" required style="width: 100%; padding: 12px; border: 2px solid #E8E8ED; border-radius: 8px; font-size: 16px; margin-top: 8px;">
                 <small style="color: #6B7B6B;">
-                    Enter jumlah item yang tersedia.
+                    Enter the number of available items.
                 </small>
             </div>
 
@@ -195,7 +195,7 @@ function cekElement() {
                 <div class="form-group" style="margin-top: 1rem;">
                     <label><i class="fas fa-boxes"></i> Available</label>
                     <input type="number" name="available" min="0" value="0" required style="width: 100%; padding: 12px; border: 2px solid #e8e8ed; border-radius: 8px;">
-                    <small style="color: #6B7B6B;">Enter jumlah item yang tersedia.</small>
+                    <small style="color: #6B7B6B;">Enter the number of available items.</small>
                 </div>
                 <label></label>
                 <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">

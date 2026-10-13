@@ -82,6 +82,6 @@ class ReturnedItemController extends Controller
             $lockedLoan->save();
         });
 
-        return back()->with('success', 'Pengembalian berhasil dikonfirmasi. Stok barang sudah diperbarui.');
+        return back()->with('success', 'The return has been successfully confirmed. The item stock has been updated.');
     }
 }

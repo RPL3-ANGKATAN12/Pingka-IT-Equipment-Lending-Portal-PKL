@@ -14,29 +14,18 @@
     </div>
 
     <div class="items-container">
-
         <div class="items-toolbar">
-
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input
-                    type="text"
-                    id="itemSearch"
-                    placeholder="Search item..."
-                    autocomplete="off"
-                >
+                <input type="text" id="itemSearch" placeholder="Search item..." autocomplete="off">
             </div>
-
             <div class="item-total">
                 {{ $items->count() }} items
             </div>
-
         </div>
 
         <div class="table-wrapper">
-
             <table class="items-table">
-
                 <thead>
                     <tr>
                         <th>No</th>
@@ -47,21 +36,15 @@
                 </thead>
 
                 <tbody id="itemsTableBody">
-
                     @forelse($items as $item)
-
                         <tr class="item-row">
-
                             <td>{{ $loop->iteration }}</td>
-
                             <td>
                                 <strong>{{ $item->name }}</strong>
                             </td>
-
                             <td>
                                 {{ $item->available }}
                             </td>
-
                             <td>
                                 @if($item->available > 0)
                                     <span class="status-badge">
@@ -73,37 +56,24 @@
                                     </span>
                                 @endif
                             </td>
-
                         </tr>
-
                     @empty
-
                         <tr>
                             <td colspan="8" class="empty-table">
                                 <i class="fas fa-box-open"></i>
                                 <p>No items available.</p>
                             </td>
                         </tr>
-
                     @endforelse
-
                 </tbody>
-
             </table>
 
-            <div
-                id="noSearchResult"
-                class="no-search-result"
-                style="display: none;"
-            >
+            <div id="noSearchResult" class="no-search-result" style="display: none;">
                 <i class="fas fa-search"></i>
                 <p>No items found.</p>
             </div>
-
         </div>
-
     </div>
-
 </div>
 
 <script>
@@ -113,26 +83,16 @@
     const noSearchResult = document.getElementById('noSearchResult');
 
     searchInput.addEventListener('input', function () {
-
         const keyword = this.value.toLowerCase().trim();
-
         let visibleRows = 0;
-
         rows.forEach(function (row) {
-
             const text = row.textContent.toLowerCase();
-
             if (text.includes(keyword)) {
-
                 row.style.display = '';
                 visibleRows++;
-
             } else {
-
                 row.style.display = 'none';
-
             }
-
         });
 
         if (visibleRows === 0 && keyword !== '') {
@@ -142,7 +102,5 @@
         }
 
     });
-
 </script>
-
 @endsection
