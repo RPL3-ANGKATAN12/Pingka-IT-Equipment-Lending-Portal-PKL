@@ -190,7 +190,8 @@
                             <select id="request_item_id" name="item_id" required>
                                 <option value="">-- Select Item --</option>
                                 @php
-                                    $availableItems = \App\Models\Item::where('available', '>', 0)
+                                    $availableItems = \App\Models\Item::where('status', 'tersedia')
+                                        ->where('available', '>', 0)
                                         ->orderBy('name')
                                         ->get();
                                 @endphp
@@ -351,6 +352,11 @@
                 return;
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
+        }
+
+        if (new URLSearchParams(window.location.search).get('request') === '1')
+        {
+            openRequestModal();
         }
 
         function closeRequestModal()

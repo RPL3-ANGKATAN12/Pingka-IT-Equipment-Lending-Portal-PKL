@@ -45,68 +45,78 @@ class AdminController extends Controller
             ->latest()
             ->get();
 
+        $stats = [
+            'Approved' => LoanRequest::where('status', 'approved')->count(),
+            'Rejected' => LoanRequest::where('status', 'rejected')->count(),
+        ];
+
         return view(
             'admin.requests',
-            compact('pendingRequests', 'historyRequests')
+            compact('pendingRequests', 'historyRequests', 'stats')
         );
     }
 
     public function approveRequest(LoanRequest $request)
     {
-        if ($request->status !== 'pending') {
+        return DB::transaction(function () use ($request) {
+            $lockedRequest = LoanRequest::whereKey($request->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedRequest->status !== 'pending') {
+                return back()->with(
+                    'error',
+                    'This request has already been processed.'
+                );
+            }
+
+            $item = Item::whereKey($lockedRequest->item_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$item) {
+                return back()->with(
+                    'error',
+                    'The requested item was not found.'
+                );
+            }
+
+            if ($item->status === 'maintenance' || $item->available <= 0) {
+                return back()->with(
+                    'error',
+                    'The item is no longer available.'
+                );
+            }
+
+            Loans::create([
+                'public_token' => Str::random(40),
+                'name' => $lockedRequest->name,
+                'email' => $lockedRequest->email,
+                'departement' => $lockedRequest->departement,
+                'item_id' => $lockedRequest->item_id,
+                'hostname' => null,
+                'type' => null,
+                'sn' => null,
+                'start_date' => $lockedRequest->start_date,
+                'others' => $lockedRequest->others,
+                'status' => 'process',
+            ]);
+
+            $lockedRequest->update(['status' => 'approved']);
+
+            $item->available--;
+            if ($item->status !== 'maintenance') {
+                $item->status = $item->available > 0
+                    ? 'tersedia'
+                    : 'dipinjam';
+            }
+            $item->save();
+
             return back()->with(
-                'error',
-                'This request has already been processed.'
+                'success',
+                'Request approved successfully and added to Loan Data.'
             );
-        }
-
-        $item = $request->item;
-
-        if (!$item) {
-            return back()->with(
-                'error',
-                'The requested item was not found.'
-            );
-        }
-
-        if ($item->available <= 0) {
-            return back()->with(
-                'error',
-                'The item is no longer available.'
-            );
-        }
-
-        Loans::create([
-            'public_token' => Str::random(40),
-            'name' => $request->name,
-            'email' => $request->email,
-            'departement' => $request->departement,
-            'item_id' => $request->item_id,
-            'hostname' => null,
-            'type' => null,
-            'sn' => null,
-            'start_date' => $request->start_date,
-            'others' => $request->others,
-            'status' => 'process',
-        ]);
-
-        $request->update([
-            'status' => 'approved',
-        ]);
-
-        $newAvailable = max(0, $item->available - 1);
-
-        $item->update([
-            'available' => $newAvailable,
-            'status' => $newAvailable > 0
-                ? 'tersedia'
-                : 'dipinjam',
-        ]);
-
-        return back()->with(
-            'success',
-            'Request approved successfully and added to Loan Data.'
-        );
+        });
     }
 
     public function rejectRequest(LoanRequest $request)
@@ -125,6 +135,91 @@ class AdminController extends Controller
         return back()->with(
             'success',
             'Request rejected successfully.'
+        );
+    }
+
+    public function bulkProcessRequests(HttpRequest $httpRequest)
+    {
+        $validated = $httpRequest->validate([
+            'action' => ['required', 'in:approve,reject'],
+            'request_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'request_ids.*' => ['required', 'integer', 'distinct', 'exists:requests,id'],
+        ]);
+
+        $result = DB::transaction(function () use ($validated) {
+            $requests = LoanRequest::whereIn('id', $validated['request_ids'])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $pendingRequests = $requests
+                ->where('status', 'pending')
+                ->values();
+            $processed = 0;
+            $skipped = $requests->count() - $pendingRequests->count();
+
+            if ($validated['action'] === 'reject') {
+                foreach ($pendingRequests as $request) {
+                    $request->update(['status' => 'rejected']);
+                    $processed++;
+                }
+
+                return compact('processed', 'skipped');
+            }
+
+            $items = Item::whereIn(
+                'id',
+                $pendingRequests->pluck('item_id')->filter()->unique()
+            )
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($pendingRequests as $request) {
+                $item = $items->get($request->item_id);
+
+                if (!$item || $item->status === 'maintenance' || $item->available <= 0) {
+                    $skipped++;
+                    continue;
+                }
+
+                Loans::create([
+                    'public_token' => Str::random(40),
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'departement' => $request->departement,
+                    'item_id' => $request->item_id,
+                    'hostname' => null,
+                    'type' => null,
+                    'sn' => null,
+                    'start_date' => $request->start_date,
+                    'others' => $request->others,
+                    'status' => 'process',
+                ]);
+
+                $request->update(['status' => 'approved']);
+                $item->available--;
+                $item->status = $item->available > 0
+                    ? 'tersedia'
+                    : 'dipinjam';
+                $item->save();
+                $processed++;
+            }
+
+            return compact('processed', 'skipped');
+        });
+
+        $actionLabel = $validated['action'] === 'approve' ? 'approved' : 'rejected';
+        $message = "{$result['processed']} request(s) {$actionLabel}.";
+
+        if ($result['skipped'] > 0) {
+            $message .= " {$result['skipped']} skipped because they were already processed or the item is unavailable.";
+        }
+
+        return back()->with(
+            $result['processed'] > 0 ? 'success' : 'error',
+            $message
         );
     }
 
@@ -178,9 +273,9 @@ class AdminController extends Controller
     public function updateLoan(HttpRequest $httpRequest, Loans $loan)
     {
         $validated = $httpRequest->validate([
-            'hostname' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'string', 'max:255'],
-            'sn' => ['nullable', 'string', 'max:255'],
+            'hostname' => ['nullable', 'string', 'max:100'],
+            'type' => ['required', 'string', 'max:50'],
+            'sn' => ['nullable', 'string', 'max:100'],
         ]);
 
         try {
@@ -238,6 +333,7 @@ class AdminController extends Controller
                         ->where('sn', $sn)
                         ->where('id', '!=', $loan->id)
                         ->whereIn('status', ['process', 'selesai'])
+                        ->whereNull('returned_at')
                         ->exists();
 
                     if ($serialUsedByAnotherLoan) {
@@ -338,6 +434,12 @@ class AdminController extends Controller
                     );
                 }
 
+                if ($oldStatus === 'process' && $newStatus === 'pending') {
+                    throw new \RuntimeException(
+                        'A loan in process cannot be reset to pending.'
+                    );
+                }
+
                 if (
                     $newStatus === 'selesai' &&
                     $item?->requires_hostname &&
@@ -353,6 +455,20 @@ class AdminController extends Controller
                 }
 
                 $usesSerialNumbers = (bool) $item->tracks_serial_numbers;
+
+                if ($usesSerialNumbers && $newStatus === 'selesai') {
+                    $serialIsAllocated = filled($loan->sn)
+                        && ItemSerialNumber::where('item_id', $item->id)
+                            ->where('serial_number', $loan->sn)
+                            ->where('status', 'borrowed')
+                            ->exists();
+
+                    if (!$serialIsAllocated) {
+                        throw new \RuntimeException(
+                            'Allocate an available Serial Number before completing this loan.'
+                        );
+                    }
+                }
 
                 if ($usesSerialNumbers && $newStatus === 'process') {
                     if (blank($loan->sn)) {

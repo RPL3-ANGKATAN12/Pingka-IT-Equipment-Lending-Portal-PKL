@@ -41,10 +41,50 @@
         </h3>
 
         @if($pendingRequests->count())
+            <div class="bulk-request-toolbar">
+                <strong id="selectedRequestCount" class="bulk-request-selection-count">
+                    No requests selected
+                </strong>
+                <div class="bulk-request-actions">
+                    <button
+                        type="button"
+                        class="bulk-request-button bulk-request-approve"
+                        disabled
+                        onclick="openBulkConfirmModal('approve')"
+                    >
+                        <i class="fas fa-check-double"></i>
+                        Approve Selected
+                    </button>
+                    <button
+                        type="button"
+                        class="bulk-request-button bulk-request-reject"
+                        disabled
+                        onclick="openBulkConfirmModal('reject')"
+                    >
+                        <i class="fas fa-times"></i>
+                        Reject Selected
+                    </button>
+                </div>
+            </div>
+
             <div class="table-container">
+                <form
+                    id="bulkRequestForm"
+                    action="{{ route('admin.requests.bulk') }}"
+                    method="POST"
+                >
+                    @csrf
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>
+                                <input
+                                    type="checkbox"
+                                    id="selectAllRequests"
+                                    aria-label="Select all pending requests"
+                                    onchange="toggleAllRequests(this)"
+                                >
+                            </th>
                             <th>No</th>
                             <th>Name</th>
                             <th>Department</th>
@@ -57,6 +97,16 @@
                     <tbody>
                         @foreach($pendingRequests as $no => $loan)
                             <tr>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        class="pending-request-checkbox"
+                                        name="request_ids[]"
+                                        value="{{ $loan->id }}"
+                                        aria-label="Select request from {{ $loan->name }}"
+                                        onchange="updateBulkRequestSelection()"
+                                    >
+                                </td>
                                 <td>{{ $no + 1 }}</td>
                                 <td><strong>{{ $loan->name }}</strong></td>
                                 <td>{{ $loan->departement }}</td>
@@ -100,6 +150,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </form>
             </div>
         @else
             <div class="empty-state">
@@ -248,6 +299,10 @@
         <p id="confirmModalText">
             Are you sure?
         </p>
+        <div id="bulkConfirmRequestCount" class="bulk-confirm-count" hidden>
+            <i class="fas fa-users"></i>
+            <span></span>
+        </div>
 
         <form id="confirmModalForm" method="POST">
             @csrf
@@ -341,6 +396,38 @@ function resetFilters() {
     applyFilters();
 }
 
+function updateBulkRequestSelection() {
+    const checkboxes = Array.from(
+        document.querySelectorAll('.pending-request-checkbox')
+    );
+    const selectedCount = checkboxes.filter(function(checkbox) {
+        return checkbox.checked;
+    }).length;
+
+    document.getElementById('selectedRequestCount').textContent =
+        selectedCount === 0
+            ? 'No requests selected'
+            : selectedCount + (selectedCount === 1 ? ' request selected' : ' requests selected');
+
+    document.querySelectorAll(
+        '.bulk-request-toolbar button[type="button"]'
+    ).forEach(function(button) {
+        button.disabled = selectedCount === 0;
+    });
+
+    const selectAll = document.getElementById('selectAllRequests');
+    selectAll.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+}
+
+function toggleAllRequests(selectAll) {
+    document.querySelectorAll('.pending-request-checkbox').forEach(function(checkbox) {
+        checkbox.checked = selectAll.checked;
+    });
+
+    updateBulkRequestSelection();
+}
+
 /* Confirmation modal */
 function openConfirmModal(type, action, name, item) {
     const modal = document.getElementById('confirmModal');
@@ -350,6 +437,8 @@ function openConfirmModal(type, action, name, item) {
     const text = document.getElementById('confirmModalText');
     const submit = document.getElementById('confirmModalSubmit');
 
+    clearBulkConfirmInputs();
+    document.getElementById('bulkConfirmRequestCount').hidden = true;
     form.action = action;
 
     icon.className = 'confirm-modal-icon';
@@ -386,6 +475,71 @@ function openConfirmModal(type, action, name, item) {
     document.body.classList.add('modal-open');
 }
 
+function openBulkConfirmModal(action) {
+    const selectedIds = Array.from(
+        document.querySelectorAll('.pending-request-checkbox:checked')
+    ).map(function(checkbox) {
+        return checkbox.value;
+    });
+
+    if (selectedIds.length === 0) {
+        return;
+    }
+
+    const form = document.getElementById('confirmModalForm');
+    const modal = document.getElementById('confirmModal');
+    const icon = document.getElementById('confirmModalIcon');
+    const title = document.getElementById('confirmModalTitle');
+    const text = document.getElementById('confirmModalText');
+    const count = document.getElementById('bulkConfirmRequestCount');
+    const submit = document.getElementById('confirmModalSubmit');
+
+    clearBulkConfirmInputs();
+    form.action = @js(route('admin.requests.bulk'));
+
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = action;
+    actionInput.className = 'bulk-confirm-input';
+    form.appendChild(actionInput);
+
+    selectedIds.forEach(function(id) {
+        const requestInput = document.createElement('input');
+        requestInput.type = 'hidden';
+        requestInput.name = 'request_ids[]';
+        requestInput.value = id;
+        requestInput.className = 'bulk-confirm-input';
+        form.appendChild(requestInput);
+    });
+
+    const isApproval = action === 'approve';
+    icon.className = 'confirm-modal-icon ' + (isApproval ? 'approve' : 'reject');
+    icon.innerHTML = isApproval
+        ? '<i class="fas fa-check-double"></i>'
+        : '<i class="fas fa-times"></i>';
+    title.textContent = isApproval
+        ? 'Approve selected requests?'
+        : 'Reject selected requests?';
+    text.textContent = isApproval
+        ? 'Requests with available items will be approved and inventory will be reserved.'
+        : 'The selected pending requests will be rejected.';
+    count.querySelector('span').textContent =
+        selectedIds.length + (selectedIds.length === 1 ? ' request selected' : ' requests selected');
+    count.hidden = false;
+    submit.className = 'confirm-modal-submit' + (isApproval ? '' : ' reject');
+    submit.textContent = isApproval ? 'Yes, approve' : 'Yes, reject';
+
+    modal.classList.add('active');
+    document.body.classList.add('modal-open');
+}
+
+function clearBulkConfirmInputs() {
+    document.querySelectorAll('.bulk-confirm-input').forEach(function(input) {
+        input.remove();
+    });
+}
+
 function closeConfirmModal() {
     document.getElementById('confirmModal').classList.remove('active');
     document.body.classList.remove('modal-open');
@@ -408,6 +562,7 @@ document.addEventListener('keydown', function (event) {
 
 /* Initialize filter */
 applyFilters();
+updateBulkRequestSelection();
 </script>
 
 @endsection

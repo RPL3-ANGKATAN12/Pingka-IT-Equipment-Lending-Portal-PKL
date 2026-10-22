@@ -19,6 +19,7 @@ class Item extends Model
         'others',
         'requires_hostname',
         'tracks_serial_numbers',
+        'target_stock',
     ];
 
     protected $casts = [

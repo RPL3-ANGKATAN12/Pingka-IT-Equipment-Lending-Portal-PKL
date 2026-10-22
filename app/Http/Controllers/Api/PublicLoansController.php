@@ -4,29 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Loans;
-use Illuminate\Http\Request;
 
 class PublicLoansController extends Controller
 {
     public function index()
     {
-        $loansList = Loans::with('employee')
+        $loansList = Loans::with('item:id,name')
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function($loans) {
+            ->map(function (Loans $loan) {
                 return [
-                    'id' => $loans->id,
-                    'judul' => $loans->judul,
-                    'deskripsi' => $loans->deskripsi,
-                    'status' => $loans->status,
-                    'respon' => $loans->respon,
-                    'respon_at' => $loans->respon_at,
-                    'created_at' => $loans->created_at,
-                    'employee' => $loans->employee ? [
-                        'nama' => $loans->employee->nama,
-                        'hostname' => $loans->employee->hostname,
-                        'departement' => $loans->employee->departement,
-                    ] : null,
+                    'id' => $loan->id,
+                    'item' => $loan->item?->name,
+                    'status' => $loan->status,
+                    'start_date' => $loan->start_date?->toDateString(),
+                    'created_at' => $loan->created_at,
                 ];
             });
 

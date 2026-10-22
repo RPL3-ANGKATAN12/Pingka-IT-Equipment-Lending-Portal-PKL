@@ -83,11 +83,13 @@
                         && !in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true)
                     )->count();
 
-                    $totalStock = $item->serialNumbers->count();
+                    $totalStock = (int) ($item->target_stock ?? $item->serialNumbers->count());
+                    $unregisteredStock = max(0, $totalStock - $item->serialNumbers->count());
                 } else {
                     $available = (int) ($item->available ?? 0);
                     $borrowed = $item->loans()->where('status', 'process')->count();
-                    $totalStock = $available + $borrowed;
+                    $totalStock = (int) ($item->target_stock ?? ($available + $borrowed));
+                    $unregisteredStock = 0;
                 }
             @endphp
 
@@ -100,7 +102,7 @@
                         {{ $item->name }}
                     </div>
 
-                    <span class="inventory-total" title="Total stock">
+                    <span class="inventory-total" title="Target stock">
                         {{ $totalStock }}
                     </span>
                 </div>
@@ -118,6 +120,9 @@
                             {{ $available }}
                         </strong>
                     </span>
+                    @if($item->tracks_serial_numbers && $unregisteredStock > 0)
+                        <span>Not Registered: <strong>{{ $unregisteredStock }}</strong></span>
+                    @endif
                 </div>
 
                 <div class="inventory-stock-bar">
@@ -174,12 +179,19 @@
                     <button
                         type="button"
                         class="edit-item-data"
+                        data-item-id="{{ $item->id }}"
+                        data-item-name="{{ $item->name }}"
+                        data-target-stock="{{ (int) ($item->target_stock ?? $available) }}"
+                        data-requires-hostname="{{ $item->requires_hostname ? 'true' : 'false' }}"
+                        data-tracks-serial-numbers="{{ $item->tracks_serial_numbers ? 'true' : 'false' }}"
+                        data-registered-serial-count="{{ $item->serialNumbers->count() }}"
                         onclick="openEditModal(
                             {{ $item->id }},
                             @js($item->name),
-                            {{ $available }},
+                            {{ (int) ($item->target_stock ?? $available) }},
                             {{ $item->requires_hostname ? 'true' : 'false' }},
-                            {{ $item->tracks_serial_numbers ? 'true' : 'false' }}
+                            {{ $item->tracks_serial_numbers ? 'true' : 'false' }},
+                            {{ $item->serialNumbers->count() }}
                         )"
                     ></button>
                 </div>
@@ -218,20 +230,21 @@
                         id="newItemName"
                         type="text"
                         name="name"
-                        maxlength="255"
+                        maxlength="100"
                         placeholder="Example: Computer"
                         required
                     >
                 </div>
 
                 <div class="inventory-field">
-                    <label for="newItemAvailable">Available Stock</label>
+                    <label for="newItemAvailable">Target Stock</label>
                     <input
                         id="newItemAvailable"
                         type="number"
                         name="available"
                         min="0"
                         value="0"
+                        oninput="updateNewItemSerialCount()"
                         required
                     >
                 </div>
@@ -247,12 +260,59 @@
                 </label>
 
                 <label class="hostname-option serial-tracking-option">
-                    <input type="checkbox" name="tracks_serial_numbers" value="1">
+                    <input
+                        id="newItemTracksSerialNumbers"
+                        type="checkbox"
+                        name="tracks_serial_numbers"
+                        value="1"
+                        onchange="toggleNewItemSerialNumbers()"
+                    >
                     <span>
                         <strong><i class="fas fa-barcode"></i> Track Serial Numbers</strong>
                         <small>Track each physical unit using its own serial number.</small>
                     </span>
                 </label>
+
+                <div
+                    id="newItemSerialNumbersField"
+                    class="new-item-serial-panel"
+                    hidden
+                >
+                    <div class="new-item-serial-heading">
+                        <div class="new-item-serial-icon" aria-hidden="true">
+                            <i class="fas fa-barcode"></i>
+                        </div>
+                        <div class="new-item-serial-title">
+                            <strong>Register serial numbers</strong>
+                            <span>Add them now or come back to this later.</span>
+                        </div>
+                        <span class="new-item-optional-badge">Optional</span>
+                    </div>
+
+                    <label for="newItemSerialNumbers">
+                        Serial numbers
+                        <span class="new-item-serial-label-hint">One per line</span>
+                    </label>
+                    <textarea
+                        id="newItemSerialNumbers"
+                        name="serial_numbers"
+                        rows="4"
+                        maxlength="50000"
+                        placeholder="Example:&#10;CN0ABC123456&#10;BG0ABC123456&#10;TL0ABC123456"
+                        oninput="updateNewItemSerialCount()"
+                        spellcheck="false"
+                    ></textarea>
+
+                    <div class="new-item-serial-meta">
+                        <span><i class="fas fa-level-down-alt"></i> Paste a list or type each number on a new line.</span>
+                        <strong id="newItemSerialCount" aria-live="polite">0 / 0 registered</strong>
+                    </div>
+
+                    <div class="new-item-serial-note">
+                        <i class="fas fa-lightbulb" aria-hidden="true"></i>
+                        <span>Leave this blank or enter only some numbers. The rest can be registered from the item card later.</span>
+                    </div>
+                </div>
             </div>
 
             <div class="inventory-modal-footer">
@@ -287,21 +347,22 @@
                         id="editItemName"
                         type="text"
                         name="name"
-                        maxlength="255"
+                        maxlength="100"
                         required
                     >
                 </div>
 
                 <div class="inventory-field">
-                    <label for="editItemAvailable">Available Stock</label>
+                    <label for="editItemAvailable">Target Stock</label>
                     <input
                         id="editItemAvailable"
                         type="number"
                         name="available"
                         min="0"
+                        oninput="updateEditItemSerialCount()"
                         required
                     >
-                    <small>Enter the current number of available items.</small>
+                    <small>Enter the total number of physical units planned for this item.</small>
                 </div>
 
                 <label class="hostname-option">
@@ -325,12 +386,57 @@
                         id="editItemTracksSerialNumbers"
                         name="tracks_serial_numbers"
                         value="1"
+                        onchange="toggleEditItemSerialNumbers()"
                     >
                     <span>
                         <strong><i class="fas fa-barcode"></i> Track Serial Numbers</strong>
                         <small>Manage the individual serial number for each physical unit.</small>
                     </span>
                 </label>
+
+                <div
+                    id="editItemSerialNumbersField"
+                    class="new-item-serial-panel"
+                    hidden
+                >
+                    <div class="new-item-serial-heading">
+                        <div class="new-item-serial-icon" aria-hidden="true">
+                            <i class="fas fa-barcode"></i>
+                        </div>
+                        <div class="new-item-serial-title">
+                            <strong>Add serial numbers</strong>
+                            <span>Enter only serial numbers that are not registered yet.</span>
+                        </div>
+                        <span class="new-item-optional-badge">Optional</span>
+                    </div>
+
+                    <label for="editItemSerialNumbers">
+                        New serial numbers
+                        <span class="new-item-serial-label-hint">One per line</span>
+                    </label>
+                    <textarea
+                        id="editItemSerialNumbers"
+                        name="serial_numbers"
+                        rows="4"
+                        maxlength="50000"
+                        placeholder="Example:&#10;LAPTOP-005&#10;LAPTOP-006"
+                        oninput="updateEditItemSerialCount()"
+                        spellcheck="false"
+                        disabled
+                    ></textarea>
+
+                    <div class="new-item-serial-meta">
+                        <span id="editItemRegisteredCount">
+                            <i class="fas fa-check-circle"></i> Already registered: 0
+                        </span>
+                        <strong id="editItemSerialCount" aria-live="polite">0 new / 0 slots</strong>
+                    </div>
+
+                    <div class="new-item-serial-note">
+                        <i class="fas fa-lightbulb" aria-hidden="true"></i>
+                        <span>Registered serials already use Target Stock slots. Do not enter them again; add only numbers for the remaining slots.</span>
+                    </div>
+                </div>
             </div>
 
             <div class="inventory-modal-footer">
@@ -539,8 +645,46 @@ function closeAddModal() {
     hideInventoryModal('addItemModal');
 }
 
+function toggleNewItemSerialNumbers() {
+    const trackingEnabled = document.getElementById(
+        'newItemTracksSerialNumbers'
+    ).checked;
+    const serialNumbersField = document.getElementById(
+        'newItemSerialNumbersField'
+    );
+
+    serialNumbersField.hidden = !trackingEnabled;
+    document.getElementById('addItemModal')
+        .querySelector('.inventory-modal-content')
+        .classList.toggle('has-serial-input', trackingEnabled);
+
+    if (!trackingEnabled) {
+        document.getElementById('newItemSerialNumbers').value = '';
+    }
+
+    updateNewItemSerialCount();
+}
+
+function updateNewItemSerialCount() {
+    const serialNumbers = document.getElementById('newItemSerialNumbers');
+    const targetStock = Number(
+        document.getElementById('newItemAvailable').value
+    ) || 0;
+    const count = serialNumbers.value
+        .split(/\r?\n/)
+        .filter(function(serialNumber) {
+            return serialNumber.trim() !== '';
+        })
+        .length;
+    const counter = document.getElementById('newItemSerialCount');
+    const panel = document.getElementById('newItemSerialNumbersField');
+
+    counter.textContent = count + ' / ' + targetStock + ' registered';
+    panel.classList.toggle('is-over-limit', count > targetStock);
+}
+
 /* EDIT ITEM */
-function openEditModal(id, name, available, requiresHostname, tracksSerialNumbers) {
+function openEditModal(id, name, available, requiresHostname, tracksSerialNumbers, registeredSerialCount) {
     currentItemId = id;
     currentItemName = name;
 
@@ -555,6 +699,18 @@ function openEditModal(id, name, available, requiresHostname, tracksSerialNumber
 
     document.getElementById('editItemTracksSerialNumbers').checked =
         Boolean(tracksSerialNumbers);
+    document.getElementById('editItemSerialNumbers').value = '';
+    document.getElementById('editItemSerialNumbers').disabled =
+        !tracksSerialNumbers;
+    document.getElementById('editItemSerialNumbersField').hidden =
+        !tracksSerialNumbers;
+    document.getElementById('editItemModal')
+        .querySelector('.inventory-modal-content')
+        .classList.toggle('has-serial-input', Boolean(tracksSerialNumbers));
+
+    document.getElementById('editItemSerialNumbersField').dataset.registeredCount =
+        Number(registeredSerialCount) || 0;
+    updateEditItemSerialCount();
 
     closeDetailModal();
     showInventoryModal('editItemModal');
@@ -562,6 +718,50 @@ function openEditModal(id, name, available, requiresHostname, tracksSerialNumber
     setTimeout(function() {
         document.getElementById('editItemName').focus();
     }, 100);
+}
+
+function toggleEditItemSerialNumbers() {
+    const trackingEnabled = document.getElementById(
+        'editItemTracksSerialNumbers'
+    ).checked;
+    const field = document.getElementById('editItemSerialNumbersField');
+    const textarea = document.getElementById('editItemSerialNumbers');
+
+    field.hidden = !trackingEnabled;
+    textarea.disabled = !trackingEnabled;
+    document.getElementById('editItemModal')
+        .querySelector('.inventory-modal-content')
+        .classList.toggle('has-serial-input', trackingEnabled);
+
+    if (!trackingEnabled) {
+        textarea.value = '';
+    }
+
+    updateEditItemSerialCount();
+}
+
+function updateEditItemSerialCount() {
+    const serialNumbers = document.getElementById('editItemSerialNumbers');
+    const field = document.getElementById('editItemSerialNumbersField');
+    const targetStock = Number(
+        document.getElementById('editItemAvailable').value
+    ) || 0;
+    const registeredCount = Number(field.dataset.registeredCount) || 0;
+    const enteredSerialNumbers = serialNumbers.value
+        .split(/\r?\n/)
+        .map(function(serialNumber) {
+            return serialNumber.trim();
+        })
+        .filter(function(serialNumber) {
+            return serialNumber !== '';
+        });
+    const count = enteredSerialNumbers.length;
+
+    document.getElementById('editItemRegisteredCount').innerHTML =
+        '<i class="fas fa-check-circle"></i> Already registered: ' + registeredCount;
+    document.getElementById('editItemSerialCount').textContent =
+        (registeredCount + count) + ' entered / ' + targetStock + ' slots remaining';
+    field.classList.toggle('is-over-limit', registeredCount + count > targetStock);
 }
 
 function closeEditModal() {
@@ -594,12 +794,23 @@ function closeDetailModal() {
 function editCurrentItem() {
     if (!currentItemId) return;
 
-    const card = document.querySelector(
-        '.inventory-card .edit-item-data[onclick*="' + currentItemId + '"]'
-    );
+    const editButton = Array.from(
+        document.querySelectorAll('.inventory-card .edit-item-data')
+    ).find(function(button) {
+        return Number(button.dataset.itemId) === Number(currentItemId);
+    });
 
-    if (card) {
-        card.click();
+    if (editButton) {
+        openEditModal(
+            Number(editButton.dataset.itemId),
+            editButton.dataset.itemName,
+            Number(editButton.dataset.targetStock),
+            editButton.dataset.requiresHostname === 'true',
+            editButton.dataset.tracksSerialNumbers === 'true',
+            Number(editButton.dataset.registeredSerialCount)
+        );
+    } else {
+        console.error('Could not find the edit data for item ' + currentItemId);
     }
 }
 

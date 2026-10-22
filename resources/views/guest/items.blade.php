@@ -43,12 +43,12 @@
                                 <strong>{{ $item->name }}</strong>
                             </td>
                             <td>
-                                {{ $item->available }}
+                                {{ $item->status === 'tersedia' ? $item->available : 0 }}
                             </td>
                             <td>
-                                @if($item->available > 0)
+                                @if($item->status === 'tersedia' && $item->available > 0)
                                     <span class="status-badge">
-                                        {{ $item->available > 0 ? 'Available' : 'Borrowed' }}
+                                        Available
                                     </span>
                                 @else
                                     <span class="status-badge">

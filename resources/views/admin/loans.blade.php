@@ -218,6 +218,17 @@
                             </td>
 
                             <td>
+                                @if(filled($loan->public_token))
+                                    <a
+                                        class="btn-table btn-outline"
+                                        href="{{ route('loans.track', $loan->public_token) }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                    >
+                                        <i class="fas fa-link"></i> Track
+                                    </a>
+                                @endif
+
                                 @if($loan->status === 'selesai')
                                     <span class="badge badge-success loan-completed-action">
                                         <i class="fas fa-check-circle"></i>
@@ -235,6 +246,7 @@
                                         onclick="openEditModal(
                                             {{ $loan->id }},
                                             @js($loan->name),
+                                            @js($loanItem->name),
                                             @js($loan->hostname),
                                             @js($loan->type),
                                             @js($loan->sn),
@@ -304,7 +316,11 @@
                     <i class="fas fa-edit"></i> Edit Loan Data
                 </h3>
 
-                <small id="editUserName"></small>
+                <div class="edit-loan-context">
+                    <small id="editUserName"></small>
+                    <span class="edit-loan-context-divider" aria-hidden="true"></span>
+                    <small id="editItemName"></small>
+                </div>
             </div>
 
             <button
@@ -343,7 +359,7 @@
                         type="text"
                         id="editHostname"
                         name="hostname"
-                        maxlength="255"
+                        maxlength="100"
                         placeholder="Enter hostname"
                     >
                 </div>
@@ -356,7 +372,7 @@
                         type="text"
                         id="editType"
                         name="type"
-                        maxlength="255"
+                        maxlength="50"
                         placeholder="Example: Laptop / PC"
                         required
                     >
@@ -516,6 +532,7 @@ applyFilters();
 function openEditModal(
     loanId,
     userName,
+    itemName,
     hostname,
     type,
     sn,
@@ -539,6 +556,8 @@ function openEditModal(
 
     document.getElementById('editUserName').textContent =
         'Borrower: ' + (userName || '-');
+    document.getElementById('editItemName').textContent =
+        'Item: ' + (itemName || '-');
 
     // Tampilkan hostname hanya jika item membutuhkannya.
     hostnameField.style.display = requiresHostname ? '' : 'none';

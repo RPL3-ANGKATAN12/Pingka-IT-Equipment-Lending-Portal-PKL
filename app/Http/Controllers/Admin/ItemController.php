@@ -9,6 +9,7 @@ use App\Models\Loans;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ItemController extends Controller
 {
@@ -18,32 +19,26 @@ class ItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        // For SN-tracked equipment, serial-number records are the source of truth.
-        // Reconcile the cached available count so legacy/stale stock values don't
-        // contradict the number of physical units recorded in the SN list.
+        $activeLoanSerials = Loans::where('status', 'process')
+            ->whereNotNull('sn')
+            ->pluck('sn')
+            ->map(fn ($sn) => mb_strtolower(trim($sn)))
+            ->all();
+
         foreach ($items as $item) {
             if (!$item->tracks_serial_numbers) {
                 continue;
             }
 
-            $activeLoanSerials = Loans::where('status', 'process')
-                ->whereNotNull('sn')
-                ->pluck('sn')
-                ->map(fn ($sn) => mb_strtolower(trim($sn)))
-                ->all();
-
-            $availableCount = $item->serialNumbers->filter(function ($serial) use ($activeLoanSerials) {
-                return $serial->status === 'available'
-                    && !in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true);
-            })->count();
-
-            $item->available = $availableCount;
-            if ((int) $item->getRawOriginal('available') !== $availableCount) {
-                $item->forceFill([
-                    'available' => $availableCount,
-                    'status' => $availableCount > 0 ? 'tersedia' : 'dipinjam',
-                ])->save();
-            }
+            $item->available = $item->serialNumbers->filter(
+                fn ($serial) =>
+                    $serial->status === 'available'
+                    && !in_array(
+                        mb_strtolower(trim($serial->serial_number)),
+                        $activeLoanSerials,
+                        true
+                    )
+            )->count();
         }
 
         return view('admin.item', compact('items'));
@@ -62,43 +57,7 @@ class ItemController extends Controller
             'hostname' => ['nullable', 'string', 'max:100'],
             'requires_hostname' => ['sometimes', 'boolean'],
             'tracks_serial_numbers' => ['sometimes', 'boolean'],
-            'type' => ['nullable', 'string', 'max:100'],
-            'sn' => ['nullable', 'string', 'max:100'],
-            'status' => [
-                'nullable',
-                Rule::in(['tersedia', 'dipinjam', 'maintenance']),
-            ],
-            'others' => ['nullable', 'string'],
-        ]);
-
-        $validated['requires_hostname'] =
-            $request->boolean('requires_hostname');
-
-        $validated['tracks_serial_numbers'] =
-            $request->boolean('tracks_serial_numbers');
-
-        $validated['status'] = $validated['status'] ?? 'tersedia';
-
-        Item::create($validated);
-
-        return redirect()
-            ->route('admin.items.index')
-            ->with('success', 'Item added successfully.');
-    }
-
-    public function edit(Item $item)
-    {
-        return view('admin.item-edit', compact('item'));
-    }
-
-    public function update(Request $request, Item $item)
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'available' => ['required', 'integer', 'min:0'],
-            'hostname' => ['nullable', 'string', 'max:100'],
-            'requires_hostname' => ['sometimes', 'boolean'],
-            'tracks_serial_numbers' => ['sometimes', 'boolean'],
+            'serial_numbers' => ['nullable', 'string', 'max:50000'],
             'type' => ['nullable', 'string', 'max:100'],
             'sn' => ['nullable', 'string', 'max:100'],
             'status' => [
@@ -109,29 +68,210 @@ class ItemController extends Controller
         ]);
 
         $trackingEnabled = $request->boolean('tracks_serial_numbers');
+        $targetStock = (int) $validated['available'];
+        $serialNumbers = collect(preg_split('/\R/u', $validated['serial_numbers'] ?? '') ?: [])
+            ->map(fn (string $serialNumber) => trim($serialNumber))
+            ->filter(fn (string $serialNumber) => $serialNumber !== '')
+            ->values();
 
-        if (
-            !$trackingEnabled &&
-            $item->serialNumbers()->exists()
-        ) {
-            return redirect()
-                ->route('admin.items.index')
-                ->with(
-                    'error',
-                    'Tracking Serial Number tidak dapat dinonaktifkan selama masih ada Serial Number terdaftar.'
-                );
+        if (!$trackingEnabled && $serialNumbers->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'serial_numbers' => 'Aktifkan pelacakan Serial Number untuk menambahkan nomor seri.',
+            ]);
         }
 
+        if ($serialNumbers->count() > $targetStock) {
+            throw ValidationException::withMessages([
+                'serial_numbers' => 'Jumlah Serial Number tidak boleh melebihi Target Stock.',
+            ]);
+        }
+
+        foreach ($serialNumbers as $serialNumber) {
+            if (mb_strlen($serialNumber) > 150) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
+                ]);
+            }
+        }
+
+        $normalizedSerialNumbers = $serialNumbers
+            ->map(fn (string $serialNumber) => mb_strtolower($serialNumber));
+
+        if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
+            throw ValidationException::withMessages([
+                'serial_numbers' => 'Serial Number yang dimasukkan tidak boleh duplikat.',
+            ]);
+        }
+
+        $validated['target_stock'] = $targetStock;
+        $validated['available'] = $trackingEnabled
+            ? $serialNumbers->count()
+            : $targetStock;
         $validated['requires_hostname'] =
             $request->boolean('requires_hostname');
-
         $validated['tracks_serial_numbers'] = $trackingEnabled;
+        $validated['status'] = $targetStock > 0
+            ? 'tersedia'
+            : ($validated['status'] ?? 'dipinjam');
+        unset($validated['serial_numbers']);
 
-        $item->update($validated);
+        DB::transaction(function () use ($validated, $serialNumbers) {
+            $item = Item::create($validated);
+
+            if ($serialNumbers->isNotEmpty()) {
+                $item->serialNumbers()->createMany(
+                    $serialNumbers->map(fn (string $serialNumber) => [
+                        'serial_number' => $serialNumber,
+                        'status' => 'available',
+                    ])->all()
+                );
+            }
+        });
 
         return redirect()
             ->route('admin.items.index')
-            ->with('success', 'Item updated successfully.');
+            ->with('success', 'Item added successfully.');
+    }
+
+    public function edit(Item $item)
+    {
+        return redirect()->route('admin.items.index');
+    }
+
+    public function update(Request $request, Item $item)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'available' => ['required', 'integer', 'min:0'],
+            'hostname' => ['nullable', 'string', 'max:100'],
+            'requires_hostname' => ['sometimes', 'boolean'],
+            'tracks_serial_numbers' => ['sometimes', 'boolean'],
+            'serial_numbers' => ['nullable', 'string', 'max:50000'],
+            'type' => ['nullable', 'string', 'max:100'],
+            'sn' => ['nullable', 'string', 'max:100'],
+            'status' => [
+                'nullable',
+                Rule::in(['tersedia', 'dipinjam', 'maintenance']),
+            ],
+            'others' => ['nullable', 'string'],
+        ]);
+
+        $newSerialNumbers = collect(preg_split('/\R/u', $validated['serial_numbers'] ?? '') ?: [])
+            ->map(fn (string $serialNumber) => trim($serialNumber))
+            ->filter(fn (string $serialNumber) => $serialNumber !== '')
+            ->values();
+
+        foreach ($newSerialNumbers as $serialNumber) {
+            if (mb_strlen($serialNumber) > 150) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
+                ]);
+            }
+        }
+
+        $normalizedSerialNumbers = $newSerialNumbers
+            ->map(fn (string $serialNumber) => mb_strtolower($serialNumber));
+
+        if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
+            throw ValidationException::withMessages([
+                'serial_numbers' => 'Serial Number yang dimasukkan tidak boleh duplikat.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($request, $item, $validated, $newSerialNumbers, $normalizedSerialNumbers) {
+            $item = Item::whereKey($item->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $trackingEnabled = $request->boolean('tracks_serial_numbers');
+
+            if (!$trackingEnabled && $newSerialNumbers->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Aktifkan pelacakan Serial Number untuk menambahkan nomor seri.',
+                ]);
+            }
+
+            if (!$trackingEnabled && $item->serialNumbers()->exists()) {
+                return redirect()
+                    ->route('admin.items.index')
+                    ->with(
+                        'error',
+                        'Serial Number tracking cannot be disabled while serial numbers are registered.'
+                    );
+            }
+
+            $targetStock = (int) $validated['available'];
+            $registeredSerialNumbers = $item->serialNumbers()->get();
+            $registeredSerialsNormalized = $registeredSerialNumbers
+                ->map(fn ($serial) => mb_strtolower(trim($serial->serial_number)));
+            $activeLoans = $item->loans()
+                ->whereIn('status', ['process', 'selesai'])
+                ->whereNull('returned_at');
+
+            if (
+                $trackingEnabled &&
+                $normalizedSerialNumbers->intersect($registeredSerialsNormalized)->isNotEmpty()
+            ) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Serial Number yang sudah terdaftar tidak perlu dimasukkan ulang.',
+                ]);
+            }
+
+            if (
+                $trackingEnabled &&
+                $targetStock < $registeredSerialNumbers->count() + $newSerialNumbers->count()
+            ) {
+                return redirect()
+                    ->route('admin.items.index')
+                    ->with('error', 'Target Stock tidak boleh kurang dari jumlah SN yang sudah terdaftar dan ditambahkan.');
+            }
+
+            if (!$trackingEnabled && $targetStock < $activeLoans->count()) {
+                return redirect()
+                    ->route('admin.items.index')
+                    ->with('error', 'Target Stock tidak boleh kurang dari jumlah barang yang sedang dipinjam.');
+            }
+
+            if ($trackingEnabled && $newSerialNumbers->isNotEmpty()) {
+                $item->serialNumbers()->createMany(
+                    $newSerialNumbers->map(fn (string $serialNumber) => [
+                        'serial_number' => $serialNumber,
+                        'status' => 'available',
+                    ])->all()
+                );
+            }
+
+            $validated['target_stock'] = $targetStock;
+            if ($trackingEnabled) {
+                $activeSerialNumbers = (clone $activeLoans)
+                    ->whereNotNull('sn')
+                    ->pluck('sn');
+
+                $validated['available'] = $item->serialNumbers()
+                    ->where('status', 'available')
+                    ->whereNotIn('serial_number', $activeSerialNumbers)
+                    ->count();
+            } else {
+                $validated['available'] = $targetStock - $activeLoans->count();
+            }
+
+            $validated['requires_hostname'] =
+                $request->boolean('requires_hostname');
+
+            $validated['tracks_serial_numbers'] = $trackingEnabled;
+            unset($validated['serial_numbers']);
+            if (!isset($validated['status']) && $item->status !== 'maintenance') {
+                $validated['status'] = $validated['available'] > 0
+                    ? 'tersedia'
+                    : 'dipinjam';
+            }
+
+            $item->update($validated);
+
+            return redirect()
+                ->route('admin.items.index')
+                ->with('success', 'Item updated successfully.');
+        });
     }
 
     public function storeSerialNumber(Request $request, Item $item)
@@ -150,8 +290,6 @@ class ItemController extends Controller
             ])->withInput();
         }
 
-        // Never register a serial number that is currently assigned to an active loan,
-        // even when an administrator is adding it under a different item.
         $currentlyBorrowed = Loans::where('sn', $serialNumber)
             ->where('status', 'process')
             ->exists();
@@ -180,13 +318,34 @@ class ItemController extends Controller
                 ]);
             }
 
+            $targetStock = (int) ($lockedItem->target_stock ?? 0);
+            $registeredCount = $lockedItem->serialNumbers()->count();
+
+            if ($registeredCount >= $targetStock) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'serial_number' => 'Target Stock sudah tercapai. Tambah Target Stock terlebih dahulu.',
+                ]);
+            }
+
             $lockedItem->serialNumbers()->create([
                 'serial_number' => $serialNumber,
                 'status' => 'available',
             ]);
 
+            $activeLoanSerials = Loans::where('status', 'process')
+                ->whereNotNull('sn')
+                ->pluck('sn')
+                ->map(fn ($sn) => mb_strtolower(trim($sn)))
+                ->all();
+
             $availableCount = $lockedItem->serialNumbers()
                 ->where('status', 'available')
+                ->get()
+                ->filter(fn ($serial) => !in_array(
+                    mb_strtolower(trim($serial->serial_number)),
+                    $activeLoanSerials,
+                    true
+                ))
                 ->count();
 
             $lockedItem->update([

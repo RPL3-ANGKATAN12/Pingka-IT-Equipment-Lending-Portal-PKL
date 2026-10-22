@@ -14,7 +14,13 @@ class LoansController extends Controller
     {
         $loans = Loans::with('item')
             ->latest()
-            ->get();
+            ->get()
+            ->each(function ($loan) {
+                $loan->hostname = null;
+                $loan->type = null;
+                $loan->sn = null;
+                $loan->others = null;
+            });
 
         $requests = LoanRequest::with('item')
             ->whereIn('status', ['pending', 'rejected'])
@@ -22,6 +28,7 @@ class LoansController extends Controller
             ->get();
 
         $requests->each(function ($request) {
+            $request->others = null;
             $request->hostname = null;
             $request->type = null;
             $request->sn = null;
@@ -40,6 +47,20 @@ class LoansController extends Controller
             ->get();
 
         return view('guest.loans', compact('loans', 'items'));
+    }
+
+    public function create()
+    {
+        return redirect()->route('guest.home', ['request' => '1']);
+    }
+
+    public function track(string $token)
+    {
+        $loan = Loans::with('item')
+            ->where('public_token', $token)
+            ->firstOrFail();
+
+        return view('guest.track', compact('loan'));
     }
 
     public function items()
@@ -62,7 +83,7 @@ class LoansController extends Controller
 
         $item = Item::findOrFail($validated['item_id']);
 
-        if ($item->available <= 0) {
+        if ($item->status === 'maintenance' || $item->available <= 0) {
             return back()
                 ->withInput()
                 ->with('error', 'This item is currently unavailable.');

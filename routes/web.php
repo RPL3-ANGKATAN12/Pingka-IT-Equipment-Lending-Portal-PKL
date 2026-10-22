@@ -34,7 +34,7 @@ Route::get('/login', function () {
 Route::post(
     '/login/admin',
     [AuthController::class, 'loginAdmin']
-)->name('login.admin');
+)->middleware('throttle:5,1')->name('login.admin');
 
 Route::post(
     '/logout',
@@ -51,12 +51,14 @@ Route::get(
 Route::post(
     '/request',
     [LoansController::class, 'store']
-)->name('loans.store');
+)->middleware('throttle:10,1')->name('loans.store');
 
 Route::get(
     '/track/{token}',
     [LoansController::class, 'track']
-)->name('loans.track');
+)->where('token', '[A-Za-z0-9]{40}')
+    ->middleware('throttle:30,1')
+    ->name('loans.track');
 
 Route::middleware(['auth', 'admin'])
     ->prefix('admin')
@@ -82,6 +84,11 @@ Route::middleware(['auth', 'admin'])
             '/requests/{request}/reject',
             [AdminController::class, 'rejectRequest']
         )->name('requests.reject');
+
+        Route::post(
+            '/requests/bulk',
+            [AdminController::class, 'bulkProcessRequests']
+        )->name('requests.bulk');
 
         Route::delete(
             '/requests/{request}',
