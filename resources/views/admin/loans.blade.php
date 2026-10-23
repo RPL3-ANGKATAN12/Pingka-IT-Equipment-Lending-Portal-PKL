@@ -218,67 +218,69 @@
                             </td>
 
                             <td>
-                                @if(filled($loan->public_token))
-                                    <a
-                                        class="btn-table btn-outline"
-                                        href="{{ route('loans.track', $loan->public_token) }}"
-                                        target="_blank"
-                                        rel="noopener"
-                                    >
-                                        <i class="fas fa-link"></i> Track
-                                    </a>
-                                @endif
-
-                                @if($loan->status === 'selesai')
-                                    <span class="badge badge-success loan-completed-action">
-                                        <i class="fas fa-check-circle"></i>
-                                        <span>Completed</span>
-                                    </span>
-
-                                @elseif(
-                                    $loan->status === 'process' &&
-                                    $loanItem &&
-                                    ($requiresHostname || $tracksSerial)
-                                )
-                                    <button
-                                        type="button"
-                                        class="btn-table btn-warning"
-                                        onclick="openEditModal(
-                                            {{ $loan->id }},
-                                            @js($loan->name),
-                                            @js($loanItem->name),
-                                            @js($loan->hostname),
-                                            @js($loan->type),
-                                            @js($loan->sn),
-                                            {{ $requiresHostname ? 'true' : 'false' }},
-                                            {{ $tracksSerial ? 'true' : 'false' }},
-                                            @js($serialOptions)
-                                        )"
-                                    >
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-
-                                @elseif($loan->status === 'process')
-                                    <form
-                                        action="{{ route('admin.loans.update-status', $loan->id) }}"
-                                        method="POST"
-                                        style="display:inline;"
-                                        onsubmit="return confirmCompleteLoan(this)"
-                                    >
-                                        @csrf
-                                        @method('PUT')
-
-                                        <input type="hidden" name="status" value="selesai">
-
-                                        <button type="submit" class="btn-table btn-success">
+                                <div class="action-buttons">
+                                    @if($loan->status === 'selesai')
+                                        <span class="badge badge-success loan-completed-action">
                                             <i class="fas fa-check-circle"></i>
-                                            Completed
-                                        </button>
-                                    </form>
+                                            <span>Completed</span>
+                                        </span>
 
-                                @else
-                                    <span style="color:#888;">-</span>
-                                @endif
+                                    @elseif(
+                                        $loan->status === 'process' &&
+                                        $loanItem &&
+                                        ($requiresHostname || $tracksSerial)
+                                    )
+                                        <button
+                                            type="button"
+                                            class="btn-table btn-warning"
+                                            onclick="openEditModal(
+                                                {{ $loan->id }},
+                                                @js($loan->name),
+                                                @js($loanItem->name),
+                                                @js($loan->hostname),
+                                                @js($loan->type),
+                                                @js($loan->sn),
+                                                {{ $requiresHostname ? 'true' : 'false' }},
+                                                {{ $tracksSerial ? 'true' : 'false' }},
+                                                @js($serialOptions)
+                                            )"
+                                        >
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+
+                                    @elseif($loan->status === 'process')
+                                        <form
+                                            action="{{ route('admin.loans.update-status', $loan->id) }}"
+                                            method="POST"
+                                            style="display:inline;"
+                                            onsubmit="return confirmCompleteLoan(this)"
+                                        >
+                                            @csrf
+                                            @method('PUT')
+
+                                            <input type="hidden" name="status" value="selesai">
+
+                                            <button type="submit" class="btn-table btn-success">
+                                                <i class="fas fa-check-circle"></i>
+                                                Completed
+                                            </button>
+                                        </form>
+
+                                    @else
+                                        <span style="color:#888;">-</span>
+                                    @endif
+
+                                    @if(filled($loan->public_token))
+                                        <a
+                                            class="btn-table btn-outline"
+                                            href="{{ route('loans.track', $loan->public_token) }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            <i class="fas fa-link"></i> Track
+                                        </a>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty

@@ -4737,7 +4737,7 @@ button.btn-primary {
 
 .returned-filter-card {
     width: 100%;
-    text-align: left;
+    text-align: center;
     font-family: inherit;
     cursor: pointer;
     transition:
