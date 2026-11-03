@@ -84,12 +84,12 @@
                         @php
                             $loanItem = $loan->item;
 
-                            $requiresHostname = (bool) (
-                                $loanItem->requires_hostname ?? false
-                            );
-
                             $tracksSerial = (bool) (
                                 $loanItem->tracks_serial_numbers ?? false
+                            );
+
+                            $requiresHostname = (bool) (
+                                $loanItem->requires_hostname ?? false
                             );
 
                             $serialOptions = collect();
@@ -117,6 +117,7 @@
                                         return [
                                             'id' => $serial->id,
                                             'serial_number' => $serial->serial_number,
+                                            'hostname' => $serial->hostname,
                                             'selected' =>
                                                 (string) $serial->serial_number ===
                                                 (string) ($loan->sn ?? ''),
@@ -364,6 +365,9 @@
                         maxlength="100"
                         placeholder="Enter hostname"
                     >
+                    <small id="editHostnameSerialHint">
+                        Hostname follows the selected Serial Number.
+                    </small>
                 </div>
 
                 {{-- TYPE / MODEL --}}
@@ -553,6 +557,7 @@ function openEditModal(
 
     const typeInput = document.getElementById('editType');
     const saveButton = document.getElementById('saveLoanButton');
+    const originalHostname = hostname || '';
 
     serialOptions = Array.isArray(serialOptions) ? serialOptions : [];
 
@@ -566,6 +571,9 @@ function openEditModal(
     hostnameInput.required = Boolean(requiresHostname);
     hostnameInput.disabled = !requiresHostname;
     hostnameInput.value = requiresHostname ? (hostname || '') : '';
+    hostnameInput.readOnly = false;
+    document.getElementById('editHostnameSerialHint').style.display =
+        requiresHostname && tracksSerial ? '' : 'none';
 
     document.getElementById('hostnameRequiredMark').textContent =
         requiresHostname ? '*' : '';
@@ -591,7 +599,10 @@ function openEditModal(
 
         const option = document.createElement('option');
         option.value = serial.serial_number;
-        option.textContent = serial.serial_number;
+        option.dataset.hostname = serial.hostname || '';
+        option.textContent = serial.hostname
+            ? serial.serial_number + ' - ' + serial.hostname
+            : serial.serial_number;
 
         if (
             serial.selected ||
@@ -602,6 +613,21 @@ function openEditModal(
 
         serialSelect.appendChild(option);
     });
+
+    serialSelect.onchange = function () {
+        const selectedOption = serialSelect.selectedOptions[0];
+        const selectedHostname = selectedOption?.dataset.hostname || '';
+
+        if (selectedHostname) {
+            hostnameInput.value = selectedHostname;
+            hostnameInput.readOnly = true;
+        } else {
+            hostnameInput.value =
+                serialSelect.value === sn ? originalHostname : '';
+            hostnameInput.readOnly = false;
+        }
+    };
+    serialSelect.onchange();
 
     typeInput.value = type || '';
 

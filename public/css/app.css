@@ -3801,6 +3801,10 @@ button.btn-primary {
     margin: 0;
 }
 
+.serial-add-form .inventory-field[hidden] {
+    display: none;
+}
+
 .serial-add-form .inventory-field input {
     width: 100%;
     max-width: 100%;
@@ -3872,12 +3876,25 @@ button.btn-primary {
     overflow-wrap: anywhere;
 }
 
+.serial-number-identifiers {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    min-width: 0;
+}
+
 .serial-number-value {
     min-width: 0;
     overflow-wrap: anywhere;
     font-size: 13px;
     font-weight: 750;
     color: var(--text-color, #273142);
+}
+
+.serial-number-hostname {
+    color: var(--text-muted, #87909f);
+    font-size: 12px;
 }
 
 .serial-status-pill {

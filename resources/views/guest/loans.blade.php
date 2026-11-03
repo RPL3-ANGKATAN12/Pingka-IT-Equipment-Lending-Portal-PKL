@@ -106,6 +106,38 @@
     </div>
 </div>
 
+<div id="othersModal" class="others-modal" aria-hidden="true">
+    <div
+        class="others-modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="othersModalTitle"
+    >
+        <div class="others-modal-header">
+            <div>
+                <h3 id="othersModalTitle">
+                    <i class="fas fa-info-circle"></i> Others Information
+                </h3>
+                <small id="othersBorrower"></small>
+            </div>
+            <button
+                type="button"
+                class="others-modal-close"
+                onclick="closeOthersModal()"
+                aria-label="Close modal"
+            >&times;</button>
+        </div>
+        <div class="others-modal-body">
+            <p id="othersContent"></p>
+        </div>
+        <div class="others-modal-footer">
+            <button type="button" class="btn-close-others" onclick="closeOthersModal()">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 @php
     $loanData = $loans->map(function ($loan) {
         return [
@@ -239,8 +271,13 @@ function renderTable() {
                     <td>
                         ${escapeHtml(loan.sn || '-')}
                     </td>
-                    <td title="${escapeHtml(loan.others || '-')}">
-                        ${escapeHtml( loan.others || '-')}
+                    <td>
+                        ${String(loan.others || '').trim()
+                            ? `<button type="button" class="btn-view-others"
+                                onclick="openOthersModal(${Number(loan.id)})">
+                                <i class="fas fa-eye"></i> View
+                            </button>`
+                            : '-'}
                     </td>
                     <td>
                         ${escapeHtml(loan.start_date || '-')}
@@ -482,26 +519,64 @@ function openDetail(loanId) {
 
 function closeDetail() {
     document.getElementById('detailModal').style.display = 'none';
-    document.body.style.overflow ='';
+    restoreBodyScrollIfNoModal();
+}
+
+function openOthersModal(loanId) {
+    const loan = loans.find(item => Number(item.id) === Number(loanId));
+    if (!loan) {
+        return;
+    }
+
+    document.getElementById('othersContent').textContent = loan.others || '-';
+    document.getElementById('othersBorrower').textContent =
+        'Borrower: ' + (loan.name || '-');
+
+    const modal = document.getElementById('othersModal');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeOthersModal() {
+    const modal = document.getElementById('othersModal');
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    restoreBodyScrollIfNoModal();
+}
+
+function restoreBodyScrollIfNoModal() {
+    const detailOpen =
+        document.getElementById('detailModal').style.display === 'flex';
+    const othersOpen =
+        document.getElementById('othersModal').classList.contains('show');
+
+    if (!detailOpen && !othersOpen) {
+        document.body.style.overflow = '';
+    }
 }
 
 window.addEventListener('click',
     function(event) {
         const modal = document.getElementById('detailModal');
-        if (event.target === modal
-        ) {
+        if (event.target === modal) {
             closeDetail();
         }
     }
 );
 
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById('othersModal');
+    if (event.target === modal) {
+        closeOthersModal();
+    }
+});
 
 document.addEventListener('keydown',
     function(event) {
-        if (
-            event.key === 'Escape'
-        ) {
+        if (event.key === 'Escape') {
             closeDetail();
+            closeOthersModal();
         }
     }
 );

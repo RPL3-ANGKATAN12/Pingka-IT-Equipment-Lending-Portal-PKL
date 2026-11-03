@@ -14,13 +14,7 @@ class LoansController extends Controller
     {
         $loans = Loans::with('item')
             ->latest()
-            ->get()
-            ->each(function ($loan) {
-                $loan->hostname = null;
-                $loan->type = null;
-                $loan->sn = null;
-                $loan->others = null;
-            });
+            ->get();
 
         $requests = LoanRequest::with('item')
             ->whereIn('status', ['pending', 'rejected'])

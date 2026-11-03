@@ -23,13 +23,6 @@
         </div>
     @endif
 
-    @if(session('success'))
-        <div class="borrowed-alert borrowed-alert-success">
-            <i class="fas fa-check-circle"></i>
-            <span>{{ session('success') }}</span>
-        </div>
-    @endif
-
     @if($errors->any())
         <div class="borrowed-alert borrowed-alert-error">
             <i class="fas fa-exclamation-triangle"></i>
@@ -91,6 +84,78 @@
                 <option value="sudah">Returned</option>
             </select>
 
+            <select
+                id="yearFilter"
+                onchange="applyFilters()"
+                aria-label="Filter by year"
+                style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; background:white;"
+            >
+                <option value="all">All Years</option>
+            </select>
+
+            <select
+                id="monthFilter"
+                onchange="applyFilters()"
+                aria-label="Filter by month"
+                style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; background:white;"
+            >
+                <option value="all">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+
+            <select
+                id="fromMonthFilter"
+                onchange="applyFilters()"
+                aria-label="Filter from month"
+                style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; background:white;"
+            >
+                <option value="">From month</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+
+            <select
+                id="toMonthFilter"
+                onchange="applyFilters()"
+                aria-label="Filter through month"
+                style="padding:10px 14px; border:1px solid #ddd; border-radius:8px; background:white;"
+            >
+                <option value="">To month</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+
             <input
                 type="text"
                 id="searchFilter"
@@ -139,6 +204,7 @@
                         <tr
                             class="returned-row"
                             data-status="{{ $loan->returned_at ? 'sudah' : 'belum' }}"
+                            data-filter-date="{{ ($loan->returned_at ?? $loan->start_date)?->format('Y-m-d') ?? '' }}"
                             data-search="{{ strtolower(($loan->name ?? '') . ' ' . ($loan->email ?? '') . ' ' . ($loan->departement ?? '') . ' ' . ($loan->item->name ?? '') . ' ' . ($loan->hostname ?? '') . ' ' . ($loan->type ?? '') . ' ' . ($loan->sn ?? '')) }}"
                         >
                             <td>{{ $loop->iteration }}</td>
@@ -188,14 +254,35 @@
                                         {{ $loan->due_date?->format('d/m/Y') ?? '-' }}
                                     </span>
                                 @else
-                                    <input
-                                        type="date"
-                                        class="return-due-date-input"
-                                        id="due_date_{{ $loan->id }}"
-                                        value="{{ $loan->due_date?->format('Y-m-d') }}"
-                                        aria-label="Return due date for {{ $loan->name }}"
-                                        required
-                                    >
+                                    <div class="return-date-input-group">
+                                        <input
+                                            type="text"
+                                            class="return-due-date-input"
+                                            id="due_date_{{ $loan->id }}"
+                                            value="{{ $loan->due_date?->format('d/m/Y') }}"
+                                            placeholder="dd/mm/yyyy"
+                                            inputmode="numeric"
+                                            autocomplete="off"
+                                            aria-label="Return due date for {{ $loan->name }}"
+                                            required
+                                        >
+                                        <button
+                                            type="button"
+                                            class="return-date-picker-button"
+                                            onclick="openDatePicker('due_date_picker_{{ $loan->id }}')"
+                                            aria-label="Choose return due date"
+                                        >
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </button>
+                                        <input
+                                            type="date"
+                                            class="native-date-picker"
+                                            id="due_date_picker_{{ $loan->id }}"
+                                            value="{{ $loan->due_date?->format('Y-m-d') }}"
+                                            aria-label="Choose return due date"
+                                            tabindex="-1"
+                                        >
+                                    </div>
 
                                     <small
                                         class="due-date-warning"
@@ -361,6 +448,35 @@
         overflow-wrap: anywhere;
     }
 
+    .return-date-input-group {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: max-content;
+        max-width: 100%;
+    }
+
+    .return-date-picker-button {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fff;
+        color: #526640;
+        cursor: pointer;
+    }
+
+    .native-date-picker {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 40px;
+        height: 100%;
+        opacity: 0;
+        pointer-events: none;
+    }
+
     .device-info-line:last-child {
         margin-bottom: 0;
     }
@@ -409,6 +525,16 @@
             display: none !important;
         }
 
+        .return-date-picker-button,
+        .native-date-picker {
+            display: none !important;
+        }
+
+        #noReturnedResults,
+        .returned-row[style*="display: none"] {
+            display: none !important;
+        }
+
         .due-date-cell input {
             display: none !important;
         }
@@ -424,6 +550,10 @@
 <script>
 function applyFilters() {
     const status = document.getElementById('statusFilter').value;
+    const year = document.getElementById('yearFilter').value;
+    const month = document.getElementById('monthFilter').value;
+    const fromMonth = document.getElementById('fromMonthFilter').value;
+    const toMonth = document.getElementById('toMonthFilter').value;
 
     const search = document
         .getElementById('searchFilter')
@@ -438,10 +568,30 @@ function applyFilters() {
     rows.forEach(function (row) {
         const rowStatus = row.dataset.status || '';
         const rowSearch = row.dataset.search || '';
+        const filterDate = row.dataset.filterDate || '';
+        const rowYear = filterDate.substring(0, 4);
+        const rowMonth = filterDate.substring(5, 7);
+        const hasDateFilter =
+            year !== 'all' ||
+            month !== 'all' ||
+            fromMonth !== '' ||
+            toMonth !== '';
 
         const statusMatch = status === 'all' || rowStatus === status;
         const searchMatch = rowSearch.includes(search);
-        const show = statusMatch && searchMatch;
+        const hasDateMatch = !hasDateFilter || filterDate !== '';
+        const yearMatch = year === 'all' || rowYear === year;
+        const monthMatch = month === 'all' || rowMonth === month;
+        const fromMonthMatch = !fromMonth || rowMonth >= fromMonth;
+        const toMonthMatch = !toMonth || rowMonth <= toMonth;
+        const show =
+            statusMatch &&
+            searchMatch &&
+            hasDateMatch &&
+            yearMatch &&
+            monthMatch &&
+            fromMonthMatch &&
+            toMonthMatch;
 
         row.style.display = show ? '' : 'none';
 
@@ -473,22 +623,76 @@ function filterStatus(status) {
 
 function resetFilters() {
     document.getElementById('statusFilter').value = 'all';
+    document.getElementById('yearFilter').value = 'all';
+    document.getElementById('monthFilter').value = 'all';
+    document.getElementById('fromMonthFilter').value = '';
+    document.getElementById('toMonthFilter').value = '';
     document.getElementById('searchFilter').value = '';
     applyFilters();
 }
 
 function printReturnedItems() {
+    applyFilters();
+
     document.querySelectorAll('.due-date-cell').forEach(function (cell) {
-        const input = cell.querySelector('input[type="date"]');
+        const input = cell.querySelector('.return-due-date-input');
 
         if (input) {
-            cell.dataset.printDate = input.value
-                ? input.value.split('-').reverse().join('/')
-                : '-';
+            cell.dataset.printDate = input.value || '-';
         }
     });
 
     window.print();
+}
+
+function parseDisplayDate(value) {
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+    if (!match) {
+        return null;
+    }
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const date = new Date(year, month - 1, day);
+
+    if (
+        year < 1000 ||
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day
+    ) {
+        return null;
+    }
+
+    return year + '-' + match[2] + '-' + match[1];
+}
+
+function openDatePicker(pickerId) {
+    const picker = document.getElementById(pickerId);
+    if (!picker) {
+        return;
+    }
+
+    if (typeof picker.showPicker === 'function') {
+        picker.showPicker();
+    } else {
+        picker.focus();
+        picker.click();
+    }
+}
+
+function syncDueDateFromPicker(picker) {
+    if (!picker.value) {
+        return;
+    }
+
+    const parts = picker.value.split('-');
+    const dateInput = document.getElementById(
+        picker.id.replace('_picker', '')
+    );
+    dateInput.value = parts[2] + '/' + parts[1] + '/' + parts[0];
+    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function setOptionalModalRow(rowId, valueId, value) {
@@ -509,8 +713,9 @@ function openReturnModal(button) {
     const loanId = button.dataset.loanId;
     const dateInput = document.getElementById('due_date_' + loanId);
     const warning = document.getElementById('due_date_warning_' + loanId);
+    const isoDate = dateInput ? parseDisplayDate(dateInput.value) : null;
 
-    if (!dateInput || !dateInput.value) {
+    if (!dateInput || !isoDate) {
         if (dateInput) {
             dateInput.classList.add('invalid');
             dateInput.focus();
@@ -535,13 +740,13 @@ function openReturnModal(button) {
     form.action = button.dataset.action || '';
 
     document.getElementById('confirmReturnDueDate').value =
-        dateInput.value;
+        isoDate;
 
-    const dateParts = dateInput.value.split('-');
+    const dateParts = dateInput.value.split('/');
 
     document.getElementById('returnDueDateDisplay').textContent =
         dateParts.length === 3
-            ? dateParts[2] + '/' + dateParts[1] + '/' + dateParts[0]
+            ? dateInput.value
             : '-';
 
     document.getElementById('returnBorrower').textContent =
@@ -589,7 +794,8 @@ function closeReturnModal() {
 
 document.querySelectorAll('.return-due-date-input').forEach(function (input) {
     input.addEventListener('change', function () {
-        if (this.value) {
+        const validDate = parseDisplayDate(this.value);
+        if (validDate) {
             this.classList.remove('invalid');
 
             const loanId = this.id.replace('due_date_', '');
@@ -600,9 +806,43 @@ document.querySelectorAll('.return-due-date-input').forEach(function (input) {
             if (warning) {
                 warning.hidden = true;
             }
+        } else if (this.value.trim() !== '') {
+            this.classList.add('invalid');
+
+            const loanId = this.id.replace('due_date_', '');
+            const warning = document.getElementById(
+                'due_date_warning_' + loanId
+            );
+
+            if (warning) {
+                warning.textContent = 'Use a valid date in dd/mm/yyyy format.';
+                warning.hidden = false;
+            }
         }
     });
 });
+
+document.querySelectorAll('.native-date-picker').forEach(function (picker) {
+    picker.addEventListener('change', function () {
+        syncDueDateFromPicker(this);
+    });
+});
+
+function populateYearFilter() {
+    const yearFilter = document.getElementById('yearFilter');
+    const years = Array.from(document.querySelectorAll('.returned-row'))
+        .map(row => (row.dataset.filterDate || '').substring(0, 4))
+        .filter(Boolean);
+
+    Array.from(new Set(years))
+        .sort((a, b) => b.localeCompare(a))
+        .forEach(function (year) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearFilter.appendChild(option);
+        });
+}
 
 document.getElementById('returnModal').addEventListener(
     'click',
@@ -644,6 +884,8 @@ window.addEventListener('afterprint', function () {
 });
 
 const urlStatus = new URLSearchParams(window.location.search).get('status');
+
+populateYearFilter();
 
 if (urlStatus && ['belum', 'sudah'].includes(urlStatus)) {
     document.getElementById('statusFilter').value = urlStatus;

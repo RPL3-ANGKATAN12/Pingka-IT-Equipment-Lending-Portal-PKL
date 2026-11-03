@@ -160,6 +160,7 @@ class AdminRequestApprovalTest extends TestCase
             'name' => 'Tracked laptop',
             'available' => 1,
             'target_stock' => 1,
+            'requires_hostname' => true,
             'tracks_serial_numbers' => true,
             'status' => 'tersedia',
         ]);
@@ -167,6 +168,7 @@ class AdminRequestApprovalTest extends TestCase
         ItemSerialNumber::create([
             'item_id' => $item->id,
             'serial_number' => 'SERIAL-001',
+            'hostname' => 'LAPTOP-001',
             'status' => 'available',
         ]);
 
@@ -203,6 +205,7 @@ class AdminRequestApprovalTest extends TestCase
         $this->assertDatabaseHas('loans', [
             'id' => $loan->id,
             'sn' => 'SERIAL-001',
+            'hostname' => 'LAPTOP-001',
             'status' => 'selesai',
         ]);
         $this->assertDatabaseHas('item_serial_numbers', [
@@ -213,6 +216,110 @@ class AdminRequestApprovalTest extends TestCase
         $this->assertDatabaseHas('items', [
             'id' => $item->id,
             'available' => 0,
+        ]);
+    }
+
+    public function test_admin_must_enter_hostname_when_assigning_a_serial_number(): void
+    {
+        $admin = User::create([
+            'nama' => 'Portal Admin',
+            'email' => 'admin@example.test',
+            'password' => 'test-password',
+            'role' => 'admin',
+        ]);
+
+        $item = Item::create([
+            'name' => 'Tracked laptop',
+            'available' => 1,
+            'target_stock' => 1,
+            'requires_hostname' => true,
+            'tracks_serial_numbers' => true,
+            'status' => 'tersedia',
+        ]);
+
+        ItemSerialNumber::create([
+            'item_id' => $item->id,
+            'serial_number' => 'SERIAL-001',
+            'status' => 'available',
+        ]);
+
+        $loan = Loans::create([
+            'public_token' => str_repeat('f', 40),
+            'name' => 'Current Borrower',
+            'email' => 'current@example.test',
+            'departement' => 'IT',
+            'item_id' => $item->id,
+            'start_date' => '2026-10-21',
+            'status' => 'process',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.loans.update', $loan), [
+                'type' => 'Laptop',
+                'sn' => 'SERIAL-001',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Hostname wajib diisi untuk barang ini.');
+
+        $this->assertDatabaseHas('loans', [
+            'id' => $loan->id,
+            'sn' => null,
+            'hostname' => null,
+            'status' => 'process',
+        ]);
+        $this->assertDatabaseHas('item_serial_numbers', [
+            'item_id' => $item->id,
+            'serial_number' => 'SERIAL-001',
+            'status' => 'available',
+        ]);
+    }
+
+    public function test_serial_number_only_items_do_not_require_hostname(): void
+    {
+        $admin = User::create([
+            'nama' => 'Portal Admin',
+            'email' => 'admin@example.test',
+            'password' => 'test-password',
+            'role' => 'admin',
+        ]);
+
+        $item = Item::create([
+            'name' => 'Tracked laptop',
+            'available' => 1,
+            'target_stock' => 1,
+            'tracks_serial_numbers' => true,
+            'status' => 'tersedia',
+        ]);
+
+        ItemSerialNumber::create([
+            'item_id' => $item->id,
+            'serial_number' => 'SERIAL-001',
+            'status' => 'available',
+        ]);
+
+        $loan = Loans::create([
+            'public_token' => str_repeat('g', 40),
+            'name' => 'Current Borrower',
+            'email' => 'current@example.test',
+            'departement' => 'IT',
+            'item_id' => $item->id,
+            'start_date' => '2026-10-21',
+            'status' => 'process',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.loans.update', $loan), [
+                'type' => 'Laptop',
+                'sn' => 'SERIAL-001',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('loans', [
+            'id' => $loan->id,
+            'sn' => 'SERIAL-001',
+            'hostname' => null,
+            'status' => 'selesai',
         ]);
     }
 

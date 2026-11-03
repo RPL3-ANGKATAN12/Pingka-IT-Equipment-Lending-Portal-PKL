@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
 
 class ItemController extends Controller
 {
@@ -68,11 +69,13 @@ class ItemController extends Controller
         ]);
 
         $trackingEnabled = $request->boolean('tracks_serial_numbers');
+        $hostnamesRequired = $trackingEnabled &&
+            $request->boolean('requires_hostname');
         $targetStock = (int) $validated['available'];
-        $serialNumbers = collect(preg_split('/\R/u', $validated['serial_numbers'] ?? '') ?: [])
-            ->map(fn (string $serialNumber) => trim($serialNumber))
-            ->filter(fn (string $serialNumber) => $serialNumber !== '')
-            ->values();
+        $serialNumbers = $this->parseSerialNumbers(
+            $validated['serial_numbers'] ?? '',
+            $hostnamesRequired
+        );
 
         if (!$trackingEnabled && $serialNumbers->isNotEmpty()) {
             throw ValidationException::withMessages([
@@ -86,16 +89,8 @@ class ItemController extends Controller
             ]);
         }
 
-        foreach ($serialNumbers as $serialNumber) {
-            if (mb_strlen($serialNumber) > 150) {
-                throw ValidationException::withMessages([
-                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
-                ]);
-            }
-        }
-
         $normalizedSerialNumbers = $serialNumbers
-            ->map(fn (string $serialNumber) => mb_strtolower($serialNumber));
+            ->map(fn (array $serial) => mb_strtolower($serial['serial_number']));
 
         if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
             throw ValidationException::withMessages([
@@ -119,12 +114,7 @@ class ItemController extends Controller
             $item = Item::create($validated);
 
             if ($serialNumbers->isNotEmpty()) {
-                $item->serialNumbers()->createMany(
-                    $serialNumbers->map(fn (string $serialNumber) => [
-                        'serial_number' => $serialNumber,
-                        'status' => 'available',
-                    ])->all()
-                );
+                $item->serialNumbers()->createMany($serialNumbers->all());
             }
         });
 
@@ -156,21 +146,16 @@ class ItemController extends Controller
             'others' => ['nullable', 'string'],
         ]);
 
-        $newSerialNumbers = collect(preg_split('/\R/u', $validated['serial_numbers'] ?? '') ?: [])
-            ->map(fn (string $serialNumber) => trim($serialNumber))
-            ->filter(fn (string $serialNumber) => $serialNumber !== '')
-            ->values();
-
-        foreach ($newSerialNumbers as $serialNumber) {
-            if (mb_strlen($serialNumber) > 150) {
-                throw ValidationException::withMessages([
-                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
-                ]);
-            }
-        }
+        $trackingEnabled = $request->boolean('tracks_serial_numbers');
+        $hostnamesRequired = $trackingEnabled &&
+            $request->boolean('requires_hostname');
+        $newSerialNumbers = $this->parseSerialNumbers(
+            $validated['serial_numbers'] ?? '',
+            $hostnamesRequired
+        );
 
         $normalizedSerialNumbers = $newSerialNumbers
-            ->map(fn (string $serialNumber) => mb_strtolower($serialNumber));
+            ->map(fn (array $serial) => mb_strtolower($serial['serial_number']));
 
         if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
             throw ValidationException::withMessages([
@@ -178,12 +163,10 @@ class ItemController extends Controller
             ]);
         }
 
-        return DB::transaction(function () use ($request, $item, $validated, $newSerialNumbers, $normalizedSerialNumbers) {
+        return DB::transaction(function () use ($request, $item, $validated, $newSerialNumbers, $normalizedSerialNumbers, $trackingEnabled) {
             $item = Item::whereKey($item->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-
-            $trackingEnabled = $request->boolean('tracks_serial_numbers');
 
             if (!$trackingEnabled && $newSerialNumbers->isNotEmpty()) {
                 throw ValidationException::withMessages([
@@ -233,12 +216,7 @@ class ItemController extends Controller
             }
 
             if ($trackingEnabled && $newSerialNumbers->isNotEmpty()) {
-                $item->serialNumbers()->createMany(
-                    $newSerialNumbers->map(fn (string $serialNumber) => [
-                        'serial_number' => $serialNumber,
-                        'status' => 'available',
-                    ])->all()
-                );
+                $item->serialNumbers()->createMany($newSerialNumbers->all());
             }
 
             $validated['target_stock'] = $targetStock;
@@ -280,9 +258,15 @@ class ItemController extends Controller
 
         $validated = $request->validate([
             'serial_number' => ['required', 'string', 'max:150'],
+            'hostname' => [
+                $item->requires_hostname ? 'required' : 'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
         $serialNumber = trim($validated['serial_number']);
+        $hostname = trim($validated['hostname'] ?? '');
 
         if ($serialNumber === '') {
             return back()->withErrors([
@@ -300,7 +284,7 @@ class ItemController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($item, $serialNumber) {
+        DB::transaction(function () use ($item, $serialNumber, $hostname) {
             $lockedItem = Item::whereKey($item->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -329,6 +313,7 @@ class ItemController extends Controller
 
             $lockedItem->serialNumbers()->create([
                 'serial_number' => $serialNumber,
+                'hostname' => $hostname !== '' ? $hostname : null,
                 'status' => 'available',
             ]);
 
@@ -424,5 +409,55 @@ class ItemController extends Controller
         return redirect()
             ->route('admin.items.index')
             ->with('success', 'Item deleted successfully.');
+    }
+
+    private function parseSerialNumbers(
+        string $input,
+        bool $hostnamesRequired
+    ): Collection {
+        $serialNumbers = collect();
+
+        foreach (preg_split('/\R/u', $input) ?: [] as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $hostname = null;
+            if ($hostnamesRequired) {
+                $parts = explode(' - ', $line, 2);
+                $serialNumber = trim($parts[0]);
+                $hostname = isset($parts[1]) ? trim($parts[1]) : '';
+
+                if ($serialNumber === '' || $hostname === '') {
+                    throw ValidationException::withMessages([
+                        'serial_numbers' => 'Isi setiap baris dengan format Serial Number - Hostname.',
+                    ]);
+                }
+            } else {
+                $serialNumber = $line;
+            }
+
+            if (mb_strlen($serialNumber) > 150) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
+                ]);
+            }
+
+            if ($hostname !== null && mb_strlen($hostname) > 100) {
+                throw ValidationException::withMessages([
+                    'serial_numbers' => 'Setiap Hostname maksimal 100 karakter.',
+                ]);
+            }
+
+            $serialNumbers->push([
+                'serial_number' => $serialNumber,
+                'hostname' => $hostname,
+                'status' => 'available',
+            ]);
+        }
+
+        return $serialNumbers;
     }
 }

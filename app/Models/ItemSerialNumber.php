@@ -12,6 +12,7 @@ class ItemSerialNumber extends Model
     protected $fillable = [
         'item_id',
         'serial_number',
+        'hostname',
         'status',
     ];
 

@@ -37,6 +37,55 @@ class AdminItemCreationTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_serial_number_and_hostname_pairs(): void
+    {
+        $admin = $this->createAdmin();
+
+        $this->actingAs($admin)
+            ->post(route('admin.items.store'), [
+                'name' => 'Laptop',
+                'available' => 2,
+                'requires_hostname' => 1,
+                'tracks_serial_numbers' => 1,
+                'serial_numbers' => "LAPTOP-001 - IT-LAPTOP-001\nLAPTOP-002 - IT-LAPTOP-002",
+            ])
+            ->assertRedirect(route('admin.items.index'))
+            ->assertSessionHas('success');
+
+        $item = Item::where('name', 'Laptop')->firstOrFail();
+
+        $this->assertDatabaseHas('item_serial_numbers', [
+            'item_id' => $item->id,
+            'serial_number' => 'LAPTOP-001',
+            'hostname' => 'IT-LAPTOP-001',
+        ]);
+        $this->assertDatabaseHas('item_serial_numbers', [
+            'item_id' => $item->id,
+            'serial_number' => 'LAPTOP-002',
+            'hostname' => 'IT-LAPTOP-002',
+        ]);
+    }
+
+    public function test_paired_serial_numbers_require_a_hostname_on_every_line(): void
+    {
+        $admin = $this->createAdmin();
+
+        $this->actingAs($admin)
+            ->from(route('admin.items.index'))
+            ->post(route('admin.items.store'), [
+                'name' => 'Laptop',
+                'available' => 2,
+                'requires_hostname' => 1,
+                'tracks_serial_numbers' => 1,
+                'serial_numbers' => "LAPTOP-001 - IT-LAPTOP-001\nLAPTOP-002",
+            ])
+            ->assertRedirect(route('admin.items.index'))
+            ->assertSessionHasErrors('serial_numbers');
+
+        $this->assertDatabaseCount('items', 0);
+        $this->assertDatabaseCount('item_serial_numbers', 0);
+    }
+
     public function test_serial_numbers_are_optional_and_can_be_added_later(): void
     {
         $admin = $this->createAdmin();
@@ -179,6 +228,35 @@ class AdminItemCreationTest extends TestCase
         ]);
     }
 
+    public function test_edit_can_add_serial_number_and_hostname_pairs(): void
+    {
+        $admin = $this->createAdmin();
+        $item = Item::create([
+            'name' => 'Laptop',
+            'available' => 2,
+            'target_stock' => 2,
+            'tracks_serial_numbers' => true,
+            'status' => 'tersedia',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.items.update', $item), [
+                'name' => 'Laptop',
+                'available' => 2,
+                'requires_hostname' => 1,
+                'tracks_serial_numbers' => 1,
+                'serial_numbers' => 'LAPTOP-001 - IT-LAPTOP-001',
+            ])
+            ->assertRedirect(route('admin.items.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('item_serial_numbers', [
+            'item_id' => $item->id,
+            'serial_number' => 'LAPTOP-001',
+            'hostname' => 'IT-LAPTOP-001',
+        ]);
+    }
+
     public function test_edit_rejects_full_serial_list_when_it_contains_already_registered_numbers(): void
     {
         $admin = $this->createAdmin();
@@ -281,6 +359,41 @@ class AdminItemCreationTest extends TestCase
             ->assertSee('data-target-stock="7"', false)
             ->assertSee('data-registered-serial-count="1"', false)
             ->assertSee('Number(editButton.dataset.registeredSerialCount)', false);
+    }
+
+    public function test_serial_number_popup_requires_and_saves_hostname_when_enabled(): void
+    {
+        $admin = $this->createAdmin();
+        $item = Item::create([
+            'name' => 'Laptop',
+            'available' => 0,
+            'target_stock' => 1,
+            'requires_hostname' => true,
+            'tracks_serial_numbers' => true,
+            'status' => 'tersedia',
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.items.index'))
+            ->post(route('admin.items.serial-numbers.store', $item), [
+                'serial_number' => 'LAPTOP-001',
+            ])
+            ->assertRedirect(route('admin.items.index'))
+            ->assertSessionHasErrors('hostname');
+
+        $this->actingAs($admin)
+            ->post(route('admin.items.serial-numbers.store', $item), [
+                'serial_number' => 'LAPTOP-001',
+                'hostname' => 'IT-LAPTOP-001',
+            ])
+            ->assertRedirect(route('admin.items.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('item_serial_numbers', [
+            'item_id' => $item->id,
+            'serial_number' => 'LAPTOP-001',
+            'hostname' => 'IT-LAPTOP-001',
+        ]);
     }
 
     private function createAdmin(): User

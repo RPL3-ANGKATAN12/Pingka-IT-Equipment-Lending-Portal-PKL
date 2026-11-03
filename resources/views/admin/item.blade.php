@@ -51,6 +51,7 @@
                     ->map(fn ($serial) => [
                         'id' => $serial->id,
                         'serial_number' => $serial->serial_number,
+                        'hostname' => $serial->hostname,
                         'status' => $serial->status,
                     ])
                     ->values();
@@ -66,6 +67,7 @@
                         ->map(fn ($serial) => [
                             'id' => $serial->id,
                             'serial_number' => $serial->serial_number,
+                            'hostname' => $serial->hostname,
                             'status' => (
                                 $serial->status === 'borrowed'
                                 || in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true)
@@ -150,7 +152,8 @@
                                 {{ $item->id }},
                                 @js($item->name),
                                 @js($serialNumbers),
-                                {{ $totalStock }}
+                                {{ $totalStock }},
+                                {{ $item->requires_hostname ? 'true' : 'false' }}
                             )"
                         >
                             <i class="fas fa-barcode"></i>
@@ -250,12 +253,18 @@
                 </div>
 
                 <label class="hostname-option">
-                    <input type="checkbox" name="requires_hostname" value="1">
+                    <input
+                        id="newItemRequiresHostname"
+                        type="checkbox"
+                        name="requires_hostname"
+                        value="1"
+                        onchange="updateNewItemSerialFormat()"
+                    >
                     <span>
                         <strong>
                             <i class="fas fa-desktop"></i> Hostname Required
                         </strong>
-                        <small>Require hostname information before completing a loan.</small>
+                        <small>Require a hostname for each serial number and when completing a loan.</small>
                     </span>
                 </label>
 
@@ -265,7 +274,7 @@
                         type="checkbox"
                         name="tracks_serial_numbers"
                         value="1"
-                        onchange="toggleNewItemSerialNumbers()"
+                        onchange="toggleNewItemSerialNumbers(); updateNewItemSerialFormat()"
                     >
                     <span>
                         <strong><i class="fas fa-barcode"></i> Track Serial Numbers</strong>
@@ -284,7 +293,7 @@
                         </div>
                         <div class="new-item-serial-title">
                             <strong>Register serial numbers</strong>
-                            <span>Add them now or come back to this later.</span>
+                            <span id="newItemSerialFormatHint">Add them now or come back to this later.</span>
                         </div>
                         <span class="new-item-optional-badge">Optional</span>
                     </div>
@@ -304,13 +313,13 @@
                     ></textarea>
 
                     <div class="new-item-serial-meta">
-                        <span><i class="fas fa-level-down-alt"></i> Paste a list or type each number on a new line.</span>
+                        <span id="newItemSerialFormatNote"><i class="fas fa-level-down-alt"></i> Paste a list or type each number on a new line.</span>
                         <strong id="newItemSerialCount" aria-live="polite">0 / 0 registered</strong>
                     </div>
 
                     <div class="new-item-serial-note">
                         <i class="fas fa-lightbulb" aria-hidden="true"></i>
-                        <span>Leave this blank or enter only some numbers. The rest can be registered from the item card later.</span>
+                        <span id="newItemSerialOptionalNote">Leave this blank or enter only some numbers. The rest can be registered from the item card later.</span>
                     </div>
                 </div>
             </div>
@@ -371,12 +380,13 @@
                         id="editItemRequiresHostname"
                         name="requires_hostname"
                         value="1"
+                        onchange="updateEditItemSerialFormat()"
                     >
                     <span>
                         <strong>
                             <i class="fas fa-desktop"></i> Hostname Required
                         </strong>
-                        <small>Require hostname information before completing a loan.</small>
+                        <small>Require a hostname for each serial number and when completing a loan.</small>
                     </span>
                 </label>
 
@@ -386,7 +396,7 @@
                         id="editItemTracksSerialNumbers"
                         name="tracks_serial_numbers"
                         value="1"
-                        onchange="toggleEditItemSerialNumbers()"
+                        onchange="toggleEditItemSerialNumbers(); updateEditItemSerialFormat()"
                     >
                     <span>
                         <strong><i class="fas fa-barcode"></i> Track Serial Numbers</strong>
@@ -405,7 +415,7 @@
                         </div>
                         <div class="new-item-serial-title">
                             <strong>Add serial numbers</strong>
-                            <span>Enter only serial numbers that are not registered yet.</span>
+                            <span id="editItemSerialFormatHint">Enter only serial numbers that are not registered yet.</span>
                         </div>
                         <span class="new-item-optional-badge">Optional</span>
                     </div>
@@ -434,7 +444,7 @@
 
                     <div class="new-item-serial-note">
                         <i class="fas fa-lightbulb" aria-hidden="true"></i>
-                        <span>Registered serials already use Target Stock slots. Do not enter them again; add only numbers for the remaining slots.</span>
+                        <span id="editItemSerialFormatNote">Registered serials already use Target Stock slots. Do not enter them again; add only numbers for the remaining slots.</span>
                     </div>
                 </div>
             </div>
@@ -546,6 +556,17 @@
                     >
                 </div>
 
+                <div id="newSerialHostnameField" class="inventory-field" hidden>
+                    <label for="newSerialHostname">Hostname</label>
+                    <input
+                        id="newSerialHostname"
+                        name="hostname"
+                        maxlength="100"
+                        placeholder="Example: IT-LAPTOP-001"
+                        autocomplete="off"
+                    >
+                </div>
+
                 <button id="addSerialButton" type="submit" class="btn-modal-save">
                     <i class="fas fa-plus"></i> Add Serial Number
                 </button>
@@ -585,6 +606,7 @@ let currentItemName = '';
 
 let currentSerialNumbers = [];
 let currentSerialLimit = 0;
+let currentSerialRequiresHostname = false;
 
 /* SEARCH ITEMS */
 function filterItems() {
@@ -665,6 +687,25 @@ function toggleNewItemSerialNumbers() {
     updateNewItemSerialCount();
 }
 
+function updateNewItemSerialFormat() {
+    const paired = document.getElementById('newItemTracksSerialNumbers').checked &&
+        document.getElementById('newItemRequiresHostname').checked;
+    const textarea = document.getElementById('newItemSerialNumbers');
+
+    textarea.placeholder = paired
+        ? 'Example:\nCN0ABC123456 - IT-LAPTOP-001\nBG0ABC123456 - IT-LAPTOP-002'
+        : 'Example:\nCN0ABC123456\nBG0ABC123456';
+    document.getElementById('newItemSerialFormatHint').textContent = paired
+        ? 'Enter each Serial Number with its Hostname.'
+        : 'Add serial numbers now or come back to this later.';
+    document.getElementById('newItemSerialFormatNote').innerHTML = paired
+        ? '<i class="fas fa-level-down-alt"></i> Use the format Serial Number - Hostname, one pair per line.'
+        : '<i class="fas fa-level-down-alt"></i> Paste a list or type each number on a new line.';
+    document.getElementById('newItemSerialOptionalNote').textContent = paired
+        ? 'Hostname is required for every serial number entered. Leave the list blank to register units later.'
+        : 'Leave this blank or enter only some numbers. The rest can be registered from the item card later.';
+}
+
 function updateNewItemSerialCount() {
     const serialNumbers = document.getElementById('newItemSerialNumbers');
     const targetStock = Number(
@@ -699,6 +740,7 @@ function openEditModal(id, name, available, requiresHostname, tracksSerialNumber
 
     document.getElementById('editItemTracksSerialNumbers').checked =
         Boolean(tracksSerialNumbers);
+    updateEditItemSerialFormat();
     document.getElementById('editItemSerialNumbers').value = '';
     document.getElementById('editItemSerialNumbers').disabled =
         !tracksSerialNumbers;
@@ -738,6 +780,22 @@ function toggleEditItemSerialNumbers() {
     }
 
     updateEditItemSerialCount();
+}
+
+function updateEditItemSerialFormat() {
+    const paired = document.getElementById('editItemTracksSerialNumbers').checked &&
+        document.getElementById('editItemRequiresHostname').checked;
+    const textarea = document.getElementById('editItemSerialNumbers');
+
+    textarea.placeholder = paired
+        ? 'Example:\nLAPTOP-005 - IT-LAPTOP-005\nLAPTOP-006 - IT-LAPTOP-006'
+        : 'Example:\nLAPTOP-005\nLAPTOP-006';
+    document.getElementById('editItemSerialFormatHint').textContent = paired
+        ? 'Enter each new Serial Number with its Hostname.'
+        : 'Enter only serial numbers that are not registered yet.';
+    document.getElementById('editItemSerialFormatNote').textContent = paired
+        ? 'Use the format Serial Number - Hostname for each new unit. Registered serials are not changed.'
+        : 'Registered serials already use Target Stock slots. Do not enter them again; add only numbers for the remaining slots.';
 }
 
 function updateEditItemSerialCount() {
@@ -828,12 +886,13 @@ function escapeHtml(value) {
 }
 
 /* SERIAL NUMBER MODAL */
-function openSerialModal(itemId, itemName, serials, totalStock) {
+function openSerialModal(itemId, itemName, serials, totalStock, requiresHostname) {
     currentItemId = itemId;
     currentItemName = itemName;
 
     currentSerialNumbers = Array.isArray(serials) ? serials : [];
     currentSerialLimit = Math.max(0, Number(totalStock) || 0);
+    currentSerialRequiresHostname = Boolean(requiresHostname);
 
     document.getElementById('serialItemName').textContent = itemName || '-';
 
@@ -843,6 +902,13 @@ function openSerialModal(itemId, itemName, serials, totalStock) {
         "/serial-numbers";
 
     document.getElementById('newSerialNumber').value = '';
+    document.getElementById('newSerialHostname').value = '';
+    document.getElementById('newSerialHostnameField').hidden =
+        !currentSerialRequiresHostname;
+    document.getElementById('newSerialHostname').required =
+        currentSerialRequiresHostname;
+    document.getElementById('newSerialHostname').disabled =
+        !currentSerialRequiresHostname;
 
     renderSerialNumbers();
     showInventoryModal('serialNumbersModal');
@@ -863,6 +929,7 @@ function renderSerialNumbers() {
     const unitsCount = document.getElementById('serialUnitsCount');
     const addButton = document.getElementById('addSerialButton');
     const input = document.getElementById('newSerialNumber');
+    const hostnameInput = document.getElementById('newSerialHostname');
     const limitMessage = document.getElementById('serialLimitMessage');
 
     const registered = currentSerialNumbers.length;
@@ -876,13 +943,16 @@ function renderSerialNumbers() {
 
     addButton.disabled = limitReached;
     input.disabled = limitReached;
+    hostnameInput.disabled = limitReached || !currentSerialRequiresHostname;
 
     limitMessage.hidden = !limitReached;
 
     if (limitReached) {
         input.placeholder = 'Stock limit reached';
+        hostnameInput.placeholder = 'Stock limit reached';
     } else {
         input.placeholder = 'Example: CN0ABC123456';
+        hostnameInput.placeholder = 'Example: IT-LAPTOP-001';
     }
 
     if (registered === 0) {
@@ -929,8 +999,15 @@ function renderSerialNumbers() {
         return (
             '<div class="serial-number-row">' +
                 '<div class="serial-number-info">' +
-                    '<div class="serial-number-value">' +
-                        escapeHtml(serial.serial_number) +
+                    '<div class="serial-number-identifiers">' +
+                        '<div class="serial-number-value">' +
+                            escapeHtml(serial.serial_number) +
+                        '</div>' +
+                        (serial.hostname
+                            ? '<div class="serial-number-hostname">' +
+                                escapeHtml(serial.hostname) +
+                              '</div>'
+                            : '') +
                     '</div>' +
                     '<span class="serial-status-pill ' + statusClass + '">' +
                         escapeHtml(statusLabel) +

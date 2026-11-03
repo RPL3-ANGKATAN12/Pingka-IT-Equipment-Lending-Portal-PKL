@@ -310,12 +310,6 @@ class AdminController extends Controller
                     );
                 }
 
-                if ($usesHostname && $hostname === '') {
-                    throw new \RuntimeException(
-                        'Hostname wajib diisi untuk barang ini.'
-                    );
-                }
-
                 if ($usesSerialNumbers) {
                     $serial = ItemSerialNumber::where('item_id', $item->id)
                         ->where('serial_number', $sn)
@@ -325,6 +319,16 @@ class AdminController extends Controller
                     if (!$serial) {
                         throw new \RuntimeException(
                             'Serial Number tidak terdaftar pada barang ini.'
+                        );
+                    }
+
+                    if ($usesHostname && filled($serial->hostname)) {
+                        $hostname = trim($serial->hostname);
+                    }
+
+                    if ($usesHostname && $hostname === '') {
+                        throw new \RuntimeException(
+                            'Hostname wajib diisi untuk barang ini.'
                         );
                     }
 
@@ -367,6 +371,12 @@ class AdminController extends Controller
                     $serial->update(['status' => 'borrowed']);
                 } else {
                     $sn = '';
+
+                    if ($usesHostname && $hostname === '') {
+                        throw new \RuntimeException(
+                            'Hostname wajib diisi untuk barang ini.'
+                        );
+                    }
                 }
 
                 $loan->hostname = $usesHostname && $hostname !== ''

@@ -42,9 +42,11 @@
             @endguest
 
             @auth
-                <a href="{{ route('guest.home') }}" class="btn-back">
-                    <i class="fas fa-home"></i>Home Page
-                </a>
+                @if(!request()->routeIs('guest.home'))
+                    <a href="{{ route('guest.home') }}" class="btn-back">
+                        <i class="fas fa-home"></i>Home Page
+                    </a>
+                @endif
                 <div class="user-info">
                     <i class="fas fa-user-circle"></i>
                     <span>{{ auth()->user()->nama ?? auth()->user()->name }}</span>
@@ -161,7 +163,7 @@
                         &times;
                     </button>
                 </div>
-                <form action="{{ route('loans.store') }}" method="POST">
+                <form id="requestForm" action="{{ route('loans.store') }}" method="POST">
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
@@ -211,7 +213,42 @@
                                 <i class="fas fa-calendar"></i>
                                 Start Date
                             </label>
-                            <input id="request_start_date" type="date" name="start_date" value="{{ old('start_date') }}" required>
+                            <div style="position:relative; display:flex; align-items:center; gap:6px;">
+                                <input
+                                    id="request_start_date"
+                                    type="text"
+                                    value="{{ old('start_date') }}"
+                                    placeholder="dd/mm/yyyy"
+                                    inputmode="numeric"
+                                    autocomplete="off"
+                                    aria-describedby="request_start_date_hint"
+                                    style="flex:1; min-width:0;"
+                                    required
+                                >
+                                <button
+                                    type="button"
+                                    onclick="openRequestDatePicker()"
+                                    aria-label="Choose start date"
+                                    style="padding:10px 12px; border:1px solid #ddd; border-radius:8px; background:white; cursor:pointer;"
+                                >
+                                    <i class="fas fa-calendar-alt"></i>
+                                </button>
+                                <input
+                                    id="request_start_date_picker"
+                                    type="date"
+                                    value="{{ old('start_date') }}"
+                                    aria-label="Choose start date"
+                                    tabindex="-1"
+                                    style="position:absolute; top:0; right:0; width:44px; height:100%; opacity:0; pointer-events:none;"
+                                >
+                            </div>
+                            <input
+                                id="request_start_date_iso"
+                                type="hidden"
+                                name="start_date"
+                                value="{{ old('start_date') }}"
+                            >
+                            <small id="request_start_date_hint"></small>
                         </div>
                         <div class="form-group">
                             <label for="request_others">
@@ -367,6 +404,84 @@
                 return;
             modal.style.display = 'none';
             document.body.style.overflow = '';
+        }
+
+        function parseDisplayDate(value)
+        {
+            const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+            if (!match)
+                return null;
+
+            const day = Number(match[1]);
+            const month = Number(match[2]);
+            const year = Number(match[3]);
+            const date = new Date(year, month - 1, day);
+
+            if (
+                year < 1000 ||
+                date.getFullYear() !== year ||
+                date.getMonth() !== month - 1 ||
+                date.getDate() !== day
+            )
+                return null;
+
+            return year + '-' + match[2] + '-' + match[1];
+        }
+
+        const requestStartDate = document.getElementById('request_start_date');
+        const requestStartDateIso = document.getElementById('request_start_date_iso');
+        const requestStartDatePicker = document.getElementById('request_start_date_picker');
+
+        function openRequestDatePicker()
+        {
+            if (!requestStartDatePicker)
+                return;
+
+            if (typeof requestStartDatePicker.showPicker === 'function')
+                requestStartDatePicker.showPicker();
+            else {
+                requestStartDatePicker.focus();
+                requestStartDatePicker.click();
+            }
+        }
+
+        if (requestStartDate && requestStartDateIso && requestStartDatePicker) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(requestStartDate.value)) {
+                const parts = requestStartDate.value.split('-');
+                requestStartDate.value = parts[2] + '/' + parts[1] + '/' + parts[0];
+            }
+
+            requestStartDatePicker.addEventListener('change', function () {
+                if (!this.value)
+                    return;
+
+                const parts = this.value.split('-');
+                requestStartDate.value = parts[2] + '/' + parts[1] + '/' + parts[0];
+                requestStartDateIso.value = this.value;
+                requestStartDate.setCustomValidity('');
+            });
+
+            document.getElementById('requestForm').addEventListener(
+                'submit',
+                function (event) {
+                    const isoDate = parseDisplayDate(requestStartDate.value);
+                    requestStartDate.setCustomValidity(
+                        isoDate ? '' : 'Enter a valid date in dd/mm/yyyy format.'
+                    );
+
+                    if (!isoDate) {
+                        event.preventDefault();
+                        requestStartDate.reportValidity();
+                        return;
+                    }
+
+                    requestStartDateIso.value = isoDate;
+                }
+            );
+
+            requestStartDate.addEventListener('input', function () {
+                this.setCustomValidity('');
+            });
         }
 
         document.addEventListener(
