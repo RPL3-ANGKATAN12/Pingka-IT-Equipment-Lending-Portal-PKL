@@ -159,4 +159,7 @@ Route::middleware(['auth', 'admin'])
         Route::post('/returned-items/{loan}/return', [ReturnedItemController::class, 'markReturned'])
             ->name('returned-items.return');
 
+        Route::post('/returned-items/{loan}/pickup', [ReturnedItemController::class, 'confirmPickup'])
+            ->name('returned-items.pickup');
+
     });

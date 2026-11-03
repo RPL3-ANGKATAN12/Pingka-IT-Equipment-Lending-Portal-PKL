@@ -11,7 +11,7 @@
                 Borrowed Items
             </h2>
             <p class="borrowed-subtitle">
-                Manage due dates and confirm returned items.
+                Confirm item pickup, manage due dates, and record returned items.
             </p>
         </div>
     </div>
@@ -20,6 +20,13 @@
         <div class="borrowed-alert borrowed-alert-error">
             <i class="fas fa-exclamation-circle"></i>
             <span>{{ session('error') }}</span>
+        </div>
+    @endif
+
+    @if(session('success'))
+        <div class="borrowed-alert borrowed-alert-success">
+            <i class="fas fa-check-circle"></i>
+            <span>{{ session('success') }}</span>
         </div>
     @endif
 
@@ -190,7 +197,6 @@
                     <tr>
                         <th>No.</th>
                         <th>Borrower</th>
-                        <th>Department</th>
                         <th>Item Name</th>
                         <th>Device Info</th>
                         <th>Borrow Date</th>
@@ -204,19 +210,22 @@
                         <tr
                             class="returned-row"
                             data-status="{{ $loan->returned_at ? 'sudah' : 'belum' }}"
-                            data-filter-date="{{ ($loan->returned_at ?? $loan->start_date)?->format('Y-m-d') ?? '' }}"
+                            data-filter-date="{{ ($loan->returned_at ?? $loan->picked_up_at ?? $loan->start_date)?->format('Y-m-d') ?? '' }}"
                             data-search="{{ strtolower(($loan->name ?? '') . ' ' . ($loan->email ?? '') . ' ' . ($loan->departement ?? '') . ' ' . ($loan->item->name ?? '') . ' ' . ($loan->hostname ?? '') . ' ' . ($loan->type ?? '') . ' ' . ($loan->sn ?? '')) }}"
                         >
                             <td>{{ $loop->iteration }}</td>
 
                             <td>
-                                <strong>{{ $loan->name }}</strong>
+                                <div class="borrower-heading">
+                                    <strong>{{ $loan->name }}</strong>
+                                    <span class="borrower-department">
+                                        {{ $loan->departement ?? '-' }}
+                                    </span>
+                                </div>
                                 <div class="borrower-email">
                                     {{ $loan->email ?? '-' }}
                                 </div>
                             </td>
-
-                            <td>{{ $loan->departement ?? '-' }}</td>
 
                             <td>{{ $loan->item->name ?? '-' }}</td>
 
@@ -245,7 +254,24 @@
                             </td>
 
                             <td>
-                                {{ $loan->start_date?->format('d/m/Y') ?? '-' }}
+                                @if($loan->status === 'selesai' && !$loan->returned_at)
+                                    <button
+                                        type="button"
+                                        class="btn-confirm-pickup"
+                                        onclick="openPickupModal(this)"
+                                        data-action="{{ route('admin.returned-items.pickup', $loan->id) }}"
+                                        data-borrower="{{ $loan->name ?? '-' }}"
+                                        data-item="{{ $loan->item->name ?? '-' }}"
+                                    >
+                                        <i class="fas fa-hand-holding"></i>
+                                        Confirm Pickup
+                                    </button>
+                                    <small class="pickup-planned-date">
+                                        Planned: {{ $loan->start_date?->format('d/m/Y') ?? '-' }}
+                                    </small>
+                                @else
+                                    {{ $loan->picked_up_at?->format('d/m/Y H:i') ?? $loan->start_date?->format('d/m/Y') ?? '-' }}
+                                @endif
                             </td>
 
                             <td class="due-date-cell">
@@ -304,6 +330,11 @@
                                     <div class="returned-date">
                                         {{ $loan->returned_at->format('d/m/Y H:i') }}
                                     </div>
+                                @elseif($loan->status === 'selesai')
+                                    <span class="pickup-pending-badge">
+                                        <i class="fas fa-clock"></i>
+                                        Waiting for Pickup
+                                    </span>
                                 @else
                                     <button
                                         type="button"
@@ -325,7 +356,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="borrowed-empty">
+                            <td colspan="7" class="borrowed-empty">
                                 <i class="fas fa-box-open"></i>
                                 <p>No loan records found.</p>
                             </td>
@@ -333,7 +364,7 @@
                     @endforelse
 
                     <tr id="noReturnedResults" style="display:none;">
-                        <td colspan="8" class="borrowed-empty">
+                        <td colspan="7" class="borrowed-empty">
                             <i class="fas fa-search"></i>
                             <p>No records found.</p>
                         </td>
@@ -341,6 +372,62 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+{{-- Confirm Pickup Modal --}}
+<div
+    id="pickupModal"
+    class="return-modal-overlay"
+    aria-hidden="true"
+>
+    <div
+        class="return-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pickupModalTitle"
+    >
+        <div class="return-modal-icon">
+            <i class="fas fa-hand-holding"></i>
+        </div>
+
+        <h3 id="pickupModalTitle">Confirm Item Pickup</h3>
+
+        <p class="return-modal-description">
+            Confirm that this borrower has picked up the prepared item.
+        </p>
+
+        <div class="return-modal-details">
+            <div class="return-detail-row">
+                <span>Borrower</span>
+                <strong id="pickupBorrower">-</strong>
+            </div>
+            <div class="return-detail-row">
+                <span>Item Name</span>
+                <strong id="pickupItem">-</strong>
+            </div>
+        </div>
+
+        <form id="pickupConfirmForm" method="POST" action="">
+            @csrf
+            <div class="return-modal-actions">
+                <button
+                    type="button"
+                    class="return-btn-cancel"
+                    onclick="closePickupModal()"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="return-btn-confirm"
+                    id="confirmPickupSubmit"
+                >
+                    <i class="fas fa-check"></i>
+                    Yes, Confirm Pickup
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -443,9 +530,60 @@
 
 @push('styles')
 <style>
+    .borrowed-table .borrower-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        gap: 8px;
+        min-width: 190px;
+    }
+
+    .borrowed-table .borrower-heading strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .borrowed-table .borrower-department {
+        flex: 0 0 auto;
+        color: #647a3a;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: right;
+    }
+
     .device-info-line {
         margin-bottom: 4px;
         overflow-wrap: anywhere;
+    }
+
+    .btn-confirm-pickup {
+        padding: 8px 11px;
+        border: 0;
+        border-radius: 7px;
+        background: #e8f2ff;
+        color: #245a91;
+        cursor: pointer;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .pickup-planned-date {
+        display: block;
+        margin-top: 5px;
+        color: #74816e;
+    }
+
+    .pickup-pending-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #986a12;
+        font-weight: 600;
+    }
+
+    .borrowed-alert-success {
+        background: #e9f7ed;
+        color: #25643a;
     }
 
     .return-date-input-group {
@@ -521,7 +659,8 @@
         .stats-grid,
         .filter-bar,
         .return-modal-overlay,
-        .return-status-cell button {
+        .return-status-cell button,
+        .btn-confirm-pickup {
             display: none !important;
         }
 
@@ -784,6 +923,29 @@ function openReturnModal(button) {
     }
 }
 
+function openPickupModal(button) {
+    const modal = document.getElementById('pickupModal');
+    const form = document.getElementById('pickupConfirmForm');
+    form.action = button.dataset.action || '';
+
+    document.getElementById('pickupBorrower').textContent =
+        button.dataset.borrower || '-';
+    document.getElementById('pickupItem').textContent =
+        button.dataset.item || '-';
+
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.return-btn-cancel').focus();
+}
+
+function closePickupModal() {
+    const modal = document.getElementById('pickupModal');
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
 function closeReturnModal() {
     const modal = document.getElementById('returnModal');
 
@@ -853,13 +1015,43 @@ document.getElementById('returnModal').addEventListener(
     }
 );
 
+document.getElementById('pickupModal').addEventListener(
+    'click',
+    function (event) {
+        if (event.target === this) {
+            closePickupModal();
+        }
+    }
+);
+
 document.addEventListener('keydown', function (event) {
     const modal = document.getElementById('returnModal');
+    const pickupModal = document.getElementById('pickupModal');
 
     if (event.key === 'Escape' && modal.classList.contains('active')) {
         closeReturnModal();
     }
+
+    if (event.key === 'Escape' && pickupModal.classList.contains('active')) {
+        closePickupModal();
+    }
 });
+
+document.getElementById('pickupConfirmForm').addEventListener(
+    'submit',
+    function (event) {
+        const button = document.getElementById('confirmPickupSubmit');
+
+        if (!this.action || button.disabled) {
+            event.preventDefault();
+            return;
+        }
+
+        button.disabled = true;
+        button.innerHTML =
+            '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
+);
 
 document.getElementById('returnConfirmForm').addEventListener(
     'submit',

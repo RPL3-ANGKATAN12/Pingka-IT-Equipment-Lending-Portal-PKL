@@ -24,12 +24,14 @@ class Loans extends Model
         'others',
         'status',
         'due_date',
+        'picked_up_at',
         'returned_at',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'due_date' => 'date',
+        'picked_up_at' => 'datetime',
         'returned_at' => 'datetime',
     ];
 

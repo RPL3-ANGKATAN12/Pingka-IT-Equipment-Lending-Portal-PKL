@@ -57,7 +57,8 @@
                     ->values();
 
                 if ($item->tracks_serial_numbers) {
-                    $activeLoanSerials = \App\Models\Loans::where('status', 'process')
+                    $activeLoanSerials = \App\Models\Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
+                        ->whereNull('returned_at')
                         ->whereNotNull('sn')
                         ->pluck('sn')
                         ->map(fn ($sn) => mb_strtolower(trim($sn)))
@@ -89,7 +90,10 @@
                     $unregisteredStock = max(0, $totalStock - $item->serialNumbers->count());
                 } else {
                     $available = (int) ($item->available ?? 0);
-                    $borrowed = $item->loans()->where('status', 'process')->count();
+                    $borrowed = $item->loans()
+                        ->whereIn('status', ['process', 'selesai', 'borrowed'])
+                        ->whereNull('returned_at')
+                        ->count();
                     $totalStock = (int) ($item->target_stock ?? ($available + $borrowed));
                     $unregisteredStock = 0;
                 }

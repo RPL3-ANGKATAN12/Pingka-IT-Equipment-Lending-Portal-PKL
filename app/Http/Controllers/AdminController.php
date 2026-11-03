@@ -22,7 +22,7 @@ class AdminController extends Controller
             'total_process' => Loans::where('status', 'process')->count(),
             'total_selesai' => Loans::where('status', 'selesai')->count(),
             'total_ditolak' => Loans::where('status', 'ditolak')->count(),
-            'total_borrowed' => Loans::where('status', 'process')->count(),
+            'total_borrowed' => Loans::where('status', 'borrowed')->count(),
         ];
 
         $recentLoans = Loans::with('item')
@@ -241,7 +241,7 @@ class AdminController extends Controller
         if ($httpRequest->filled('status')) {
             $httpRequest->validate([
                 'status' => [
-                    'in:pending,process,selesai,ditolak',
+                    'in:pending,process,selesai,borrowed,ditolak',
                 ],
             ]);
 
@@ -254,6 +254,7 @@ class AdminController extends Controller
             'Pending' => Loans::where('status', 'pending')->count(),
             'Process' => Loans::where('status', 'process')->count(),
             'Done' => Loans::where('status', 'selesai')->count(),
+            'Borrowed' => Loans::where('status', 'borrowed')->count(),
             'Rejected' => Loans::where('status', 'ditolak')->count(),
         ];
 
@@ -291,7 +292,7 @@ class AdminController extends Controller
                     throw new \RuntimeException('Item not found.');
                 }
 
-                if ($loan->status === 'selesai') {
+                if (in_array($loan->status, ['selesai', 'borrowed'], true)) {
                     throw new \RuntimeException(
                         'Completed loans cannot be changed anymore.'
                     );
@@ -336,7 +337,7 @@ class AdminController extends Controller
                     $serialUsedByAnotherLoan = Loans::where('item_id', $item->id)
                         ->where('sn', $sn)
                         ->where('id', '!=', $loan->id)
-                        ->whereIn('status', ['process', 'selesai'])
+                        ->whereIn('status', ['process', 'selesai', 'borrowed'])
                         ->whereNull('returned_at')
                         ->exists();
 
@@ -432,7 +433,7 @@ class AdminController extends Controller
                 $newStatus = $validated['status'];
                 $item = $loan->item;
 
-                if ($oldStatus === 'selesai') {
+                if (in_array($oldStatus, ['selesai', 'borrowed'], true)) {
                     throw new \RuntimeException(
                         'Completed loans cannot be changed anymore.'
                     );

@@ -14,7 +14,7 @@
                 <span class="stat-label">Total Loans</span>
             </div>
 
-            <div class= "stat-card">
+            <div class="stat-card">
                 <span class="stat-number">{{ $loans->where('status', 'pending')->count() }}</span>
                 <span class="stat-label">Pending</span>
             </div>
@@ -26,6 +26,11 @@
 
             <div class="stat-card">
                 <span class="stat-number">{{ $loans->where('status', 'selesai')->count() }}</span>
+                <span class="stat-label">Ready for Pickup</span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number">{{ $loans->where('status', 'borrowed')->count() }}</span>
                 <span class="stat-label">Completed</span>
             </div>
 
@@ -45,7 +50,8 @@
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
                     <option value="process">Process</option>
-                    <option value="selesai">Completed</option>
+                    <option value="selesai">Please pick up your item</option>
+                    <option value="borrowed">Completed</option>
                     <option value="ditolak">Rejected</option>
                 </select>
                 <select id="itemFilter" class="filter-input" onchange="applyFilters()">
@@ -63,14 +69,13 @@
             </button>
         </div>
 
-        <div class="table-wrapper">
-            <div class="table-scroll">
-                <table class="data-table">
+        <div class="table-wrapper loan-table-wrapper">
+            <div class="table-scroll loan-table-scroll">
+                <table class="data-table loan-data-table">
                     <thead>
                         <tr>
                             <th>No</th>
                             <th>Name</th>
-                            <th>Department</th>
                             <th>Item</th>
                             <th>Hostname</th>
                             <th>Type</th>
@@ -78,7 +83,6 @@
                             <th>Others</th>
                             <th>Start Date</th>
                             <th>Status</th>
-                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="loanTable">
@@ -90,6 +94,103 @@
         <div class="pagination" id="pagination"></div>
     </div>
 </section>
+
+@push('styles')
+<style>
+    .loan-table-scroll {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .loan-data-table {
+        width: 100%;
+        min-width: 860px;
+        table-layout: fixed;
+    }
+
+    .loan-data-table th,
+    .loan-data-table td {
+        padding: 12px 10px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        vertical-align: middle;
+    }
+
+    .loan-data-table th:nth-child(1),
+    .loan-data-table td:nth-child(1) { width: 4%; }
+    .loan-data-table th:nth-child(2),
+    .loan-data-table td:nth-child(2) { width: 16%; }
+    .loan-data-table th:nth-child(3),
+    .loan-data-table td:nth-child(3) { width: 14%; }
+    .loan-data-table th:nth-child(4),
+    .loan-data-table td:nth-child(4) { width: 12%; }
+    .loan-data-table th:nth-child(5),
+    .loan-data-table td:nth-child(5) { width: 12%; }
+    .loan-data-table th:nth-child(6),
+    .loan-data-table td:nth-child(6) { width: 11%; }
+    .loan-data-table th:nth-child(7),
+    .loan-data-table td:nth-child(7) { width: 8%; }
+    .loan-data-table th:nth-child(8),
+    .loan-data-table td:nth-child(8) { width: 10%; }
+    .loan-data-table th:nth-child(9),
+    .loan-data-table td:nth-child(9) { width: 13%; }
+
+    .loan-data-table td {
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .loan-data-table .name-cell,
+    .loan-data-table .department-cell {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        line-height: 1.4;
+    }
+
+    .loan-data-table .department-cell {
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+    }
+
+    .loan-data-table .name-cell i,
+    .loan-data-table .department-cell i {
+        flex: 0 0 14px;
+        margin-top: 3px;
+        text-align: center;
+    }
+
+    .loan-data-table .status-badge {
+        display: flex;
+        justify-content: flex-start;
+    }
+
+    .loan-data-table .badge {
+        max-width: 100%;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.35;
+    }
+
+    .loan-data-table .detail-button {
+        margin-top: 6px;
+    }
+
+    @media (max-width: 768px) {
+        .loan-data-table {
+            min-width: 860px;
+        }
+
+        .loan-data-table th,
+        .loan-data-table td {
+            padding: 10px 8px;
+            font-size: 0.78rem;
+        }
+    }
+</style>
+@endpush
 
 <div id="detailModal" class="modal">
     <div class="modal-content">
@@ -191,6 +292,9 @@ function getStatusBadge(status) {
         return `<span class="badge badge-info">Process</span>`;
     }
     if (status === 'selesai') {
+        return `<span class="badge badge-warning">Please pick up your item</span>`;
+    }
+    if (status === 'borrowed') {
         return `<span class="badge badge-success">Completed</span>`;
     }
     if (status === 'ditolak') {
@@ -234,7 +338,7 @@ function renderTable() {
     if (!filteredLoans.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="11" class="empty-state">
+                <td colspan="9" class="empty-state">
                     <i class="fas fa-inbox"></i>
                     <p>No data matches the filter.</p>
                 </td>
@@ -254,10 +358,14 @@ function renderTable() {
                         <strong>${start + index + 1}</strong>
                     </td>
                     <td>
-                        <strong>${escapeHtml(loan.name || '-')}</strong>
-                    </td>
-                    <td>
-                        ${escapeHtml(loan.departement || '-')}
+                        <div class="name-cell">
+                            <i class="fas fa-user"></i>
+                            ${escapeHtml(loan.name || '-')}
+                        </div>
+                        <div class="department-cell">
+                            <i class="fas fa-building"></i>
+                            ${escapeHtml(loan.departement || '-')}
+                        </div>
                     </td>
                     <td>
                         ${escapeHtml(loan.item || '-')}
@@ -283,16 +391,18 @@ function renderTable() {
                         ${escapeHtml(loan.start_date || '-')}
                     </td>
                     <td>
-                        ${getStatusBadge(loan.status)}
-                    </td>
-                    <td>
-                        <button type="button" class="btn-detail-table"
-                            onclick="openDetail(
-                                ${Number(loan.id)}
-                            )">
-                            <i class="fas fa-eye"></i>
-                            Detail
-                        </button>
+                        <div class="status-badge">
+                            ${getStatusBadge(loan.status)}
+                        </div>
+                        <div class="detail-button">
+                            <button type="button" class="btn-detail-table"
+                                onclick="openDetail(
+                                    ${Number(loan.id)}
+                                )">
+                                <i class="fas fa-eye"></i>
+                                Detail
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 `;

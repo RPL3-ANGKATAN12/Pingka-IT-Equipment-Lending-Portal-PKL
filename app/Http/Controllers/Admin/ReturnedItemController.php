@@ -14,19 +14,19 @@ class ReturnedItemController extends Controller
     public function index()
     {
         $loans = Loans::with('item')
-            ->where('status', 'selesai')
+            ->whereIn('status', ['selesai', 'borrowed'])
             ->whereHas('item')
             ->orderByRaw('returned_at IS NOT NULL')
             ->orderByDesc('id')
             ->get();
 
         $stats = [
-            'not_returned' => Loans::where('status', 'selesai')
+            'not_returned' => Loans::whereIn('status', ['selesai', 'borrowed'])
                 ->whereNull('returned_at')
                 ->whereHas('item')
                 ->count(),
 
-            'returned' => Loans::where('status', 'selesai')
+            'returned' => Loans::whereIn('status', ['selesai', 'borrowed'])
                 ->whereNotNull('returned_at')
                 ->whereHas('item')
                 ->count(),
@@ -42,8 +42,8 @@ class ReturnedItemController extends Controller
             'due_date' => ['required', 'date'],
         ]);
 
-        if ($loan->status !== 'selesai') {
-            return back()->with('error', 'Hanya peminjaman berstatus selesai yang dapat diatur tanggal pengembaliannya.');
+        if (!in_array($loan->status, ['selesai', 'borrowed'], true)) {
+            return back()->with('error', 'Tanggal pengembalian hanya dapat diatur setelah persiapan peminjaman selesai.');
         }
 
         if ($loan->returned_at !== null) {
@@ -56,7 +56,33 @@ class ReturnedItemController extends Controller
         return back()->with('success', 'Tanggal batas pengembalian berhasil disimpan.');
     }
 
-    
+    public function confirmPickup(Loans $loan)
+    {
+        DB::transaction(function () use ($loan) {
+            $lockedLoan = Loans::whereKey($loan->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedLoan->status !== 'selesai') {
+                throw ValidationException::withMessages([
+                    'pickup' => 'Peminjaman ini tidak sedang menunggu pengambilan.',
+                ]);
+            }
+
+            if ($lockedLoan->returned_at !== null) {
+                throw ValidationException::withMessages([
+                    'pickup' => 'Barang ini sudah dikembalikan.',
+                ]);
+            }
+
+            $lockedLoan->status = 'borrowed';
+            $lockedLoan->picked_up_at = now();
+            $lockedLoan->save();
+        });
+
+        return back()->with('success', 'Pengambilan barang berhasil dikonfirmasi.');
+    }
+
     public function markReturned(Request $request, Loans $loan)
     {
         $validated = $request->validate([
@@ -69,9 +95,9 @@ class ReturnedItemController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($lockedLoan->status !== 'selesai') {
+            if ($lockedLoan->status !== 'borrowed') {
                 throw ValidationException::withMessages([
-                    'returned' => 'Status peminjaman belum selesai.',
+                    'returned' => 'Pengambilan barang belum dikonfirmasi.',
                 ]);
             }
 
@@ -113,7 +139,7 @@ class ReturnedItemController extends Controller
                 $usedByAnotherLoan = Loans::where('item_id', $item->id)
                     ->where('sn', $lockedLoan->sn)
                     ->where('id', '!=', $lockedLoan->id)
-                    ->whereIn('status', ['process', 'selesai'])
+                    ->whereIn('status', ['process', 'selesai', 'borrowed'])
                     ->whereNull('returned_at')
                     ->exists();
 

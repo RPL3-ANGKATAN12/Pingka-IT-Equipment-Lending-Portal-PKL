@@ -180,7 +180,8 @@ class AdminRequestApprovalTest extends TestCase
             'item_id' => $item->id,
             'sn' => 'SERIAL-001',
             'start_date' => '2026-10-01',
-            'status' => 'selesai',
+            'status' => 'borrowed',
+            'picked_up_at' => now(),
             'returned_at' => now(),
         ]);
 

@@ -69,7 +69,7 @@
                 <i class="fas fa-arrow-up-right-from-square overview-arrow"></i>
             </a>
 
-            <a href="{{ route('admin.loans', ['status' => 'process']) }}"
+            <a href="{{ route('admin.loans', ['status' => 'borrowed']) }}"
                class="overview-card">
                 <div class="overview-icon">
                     <i class="fas fa-hand-holding"></i>
@@ -77,7 +77,7 @@
                 <div class="overview-info">
                     <span>Currently Borrowed</span>
                     <strong>{{ $stats['total_borrowed'] ?? 0 }}</strong>
-                    <small>Loans in proses</small>
+                    <small>Pickup confirmed by admin</small>
                 </div>
                 <i class="fas fa-arrow-up-right-from-square overview-arrow"></i>
             </a>
@@ -130,7 +130,11 @@
                         </span>
                     @elseif($loan->status === 'selesai')
                         <span class="activity-badge badge-completed">
-                            <i class="fas fa-check-circle"></i> Completed
+                            <i class="fas fa-check-circle"></i> Ready for Pickup
+                        </span>
+                    @elseif($loan->status === 'borrowed')
+                        <span class="activity-badge badge-process">
+                            <i class="fas fa-hand-holding"></i> Borrowed
                         </span>
                     @elseif($loan->status === 'pending')
                         <span class="activity-badge badge-pending">

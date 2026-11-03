@@ -301,6 +301,7 @@
     $status = $loan->status;
     $isRejected = $status === 'ditolak';
     $isPrepared = $status === 'selesai';
+    $isBorrowed = $status === 'borrowed';
     $isReturned = $loan->returned_at !== null;
 
     $statusDetails = match (true) {
@@ -317,8 +318,14 @@
             'icon' => 'fa-circle-check',
         ],
         $isPrepared => [
+            'label' => 'Perangkat siap diambil',
+            'description' => 'Perangkat telah disiapkan. Silakan ambil barang Anda.',
+            'class' => 'is-warning',
+            'icon' => 'fa-hand',
+        ],
+        $isBorrowed => [
             'label' => 'Peminjaman berlangsung',
-            'description' => 'Perangkat telah disiapkan dan sedang dalam masa peminjaman.',
+            'description' => 'Admin telah mengonfirmasi bahwa perangkat sudah diambil.',
             'class' => '',
             'icon' => 'fa-laptop',
         ],
@@ -369,26 +376,33 @@
                 </div>
             @else
                 <ol class="tracking-timeline">
-                    <li class="tracking-step {{ in_array($status, ['process', 'selesai'], true) || $isReturned ? 'is-complete' : 'is-current' }}">
+                    <li class="tracking-step {{ in_array($status, ['process', 'selesai', 'borrowed'], true) || $isReturned ? 'is-complete' : 'is-current' }}">
                         <span class="tracking-step-marker" aria-hidden="true">
-                            <i class="fas {{ in_array($status, ['process', 'selesai'], true) || $isReturned ? 'fa-check' : 'fa-file-lines' }}"></i>
+                            <i class="fas {{ in_array($status, ['process', 'selesai', 'borrowed'], true) || $isReturned ? 'fa-check' : 'fa-file-lines' }}"></i>
                         </span>
                         <strong>{{ $status === 'pending' ? 'Permintaan diterima' : 'Permintaan disetujui' }}</strong>
                         <span>Permintaan masuk ke proses peminjaman.</span>
                     </li>
-                    <li class="tracking-step {{ $isPrepared || $isReturned ? 'is-complete' : ($status === 'process' ? 'is-current' : '') }}">
+                    <li class="tracking-step {{ $isPrepared || $isBorrowed || $isReturned ? 'is-complete' : ($status === 'process' ? 'is-current' : '') }}">
                         <span class="tracking-step-marker" aria-hidden="true">
-                            <i class="fas {{ $isPrepared || $isReturned ? 'fa-check' : 'fa-box' }}"></i>
+                            <i class="fas {{ $isPrepared || $isBorrowed || $isReturned ? 'fa-check' : 'fa-box' }}"></i>
                         </span>
                         <strong>Perangkat disiapkan</strong>
                         <span>Admin menyiapkan perangkat untuk dipinjam.</span>
                     </li>
-                    <li class="tracking-step {{ $isReturned ? 'is-complete' : ($isPrepared ? 'is-current' : '') }}">
+                    <li class="tracking-step {{ $isBorrowed || $isReturned ? 'is-complete' : ($isPrepared ? 'is-current' : '') }}">
+                        <span class="tracking-step-marker" aria-hidden="true">
+                            <i class="fas {{ $isBorrowed || $isReturned ? 'fa-check' : 'fa-hand' }}"></i>
+                        </span>
+                        <strong>Pengambilan perangkat</strong>
+                        <span>{{ $isBorrowed || $isReturned ? 'Pengambilan perangkat telah dikonfirmasi admin.' : 'Silakan ambil perangkat yang telah disiapkan.' }}</span>
+                    </li>
+                    <li class="tracking-step {{ $isReturned ? 'is-complete' : ($isBorrowed ? 'is-current' : '') }}">
                         <span class="tracking-step-marker" aria-hidden="true">
                             <i class="fas {{ $isReturned ? 'fa-check' : 'fa-rotate-left' }}"></i>
                         </span>
                         <strong>Pengembalian</strong>
-                        <span>{{ $isReturned ? 'Pengembalian sudah dicatat.' : 'Menunggu perangkat dikembalikan.' }}</span>
+                        <span>{{ $isReturned ? 'Pengembalian sudah dicatat.' : ($isBorrowed ? 'Menunggu perangkat dikembalikan.' : 'Pengembalian dimulai setelah perangkat diambil.') }}</span>
                     </li>
                 </ol>
             @endif

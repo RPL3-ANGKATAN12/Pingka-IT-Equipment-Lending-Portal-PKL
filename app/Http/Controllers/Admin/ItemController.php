@@ -20,7 +20,8 @@ class ItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        $activeLoanSerials = Loans::where('status', 'process')
+        $activeLoanSerials = Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
+            ->whereNull('returned_at')
             ->whereNotNull('sn')
             ->pluck('sn')
             ->map(fn ($sn) => mb_strtolower(trim($sn)))
@@ -188,7 +189,7 @@ class ItemController extends Controller
             $registeredSerialsNormalized = $registeredSerialNumbers
                 ->map(fn ($serial) => mb_strtolower(trim($serial->serial_number)));
             $activeLoans = $item->loans()
-                ->whereIn('status', ['process', 'selesai'])
+                ->whereIn('status', ['process', 'selesai', 'borrowed'])
                 ->whereNull('returned_at');
 
             if (
@@ -275,7 +276,8 @@ class ItemController extends Controller
         }
 
         $currentlyBorrowed = Loans::where('sn', $serialNumber)
-            ->where('status', 'process')
+            ->whereIn('status', ['process', 'selesai', 'borrowed'])
+            ->whereNull('returned_at')
             ->exists();
 
         if ($currentlyBorrowed) {
@@ -317,7 +319,8 @@ class ItemController extends Controller
                 'status' => 'available',
             ]);
 
-            $activeLoanSerials = Loans::where('status', 'process')
+            $activeLoanSerials = Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
+                ->whereNull('returned_at')
                 ->whereNotNull('sn')
                 ->pluck('sn')
                 ->map(fn ($sn) => mb_strtolower(trim($sn)))

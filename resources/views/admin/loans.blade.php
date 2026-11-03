@@ -25,6 +25,11 @@
 
         <div class="status-card selesai" onclick="filterStatus('selesai')" style="cursor:pointer;">
             <h4>{{ $stats['Done'] ?? 0 }}</h4>
+            <p><i class="fas fa-check-circle"></i> Ready for Pickup</p>
+        </div>
+
+        <div class="status-card" onclick="filterStatus('borrowed')" style="cursor:pointer;">
+            <h4>{{ $stats['Borrowed'] ?? 0 }}</h4>
             <p><i class="fas fa-check-circle"></i> Completed</p>
         </div>
     </div>
@@ -36,7 +41,8 @@
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="process">Process</option>
-                <option value="selesai">Completed</option>
+                <option value="selesai">Ready for Pickup</option>
+                <option value="borrowed">Completed</option>
                 <option value="ditolak">Rejected</option>
             </select>
 
@@ -69,7 +75,6 @@
                     <tr>
                         <th>No.</th>
                         <th>Borrowed</th>
-                        <th>Department</th>
                         <th>Item</th>
                         <th>Device Info</th>
                         <th>Others</th>
@@ -107,7 +112,8 @@
                                                 $loan->item_id
                                             )
                                             ->where('sn', $serial->serial_number)
-                                            ->whereIn('status', ['process', 'selesai'])
+                                            ->whereIn('status', ['process', 'selesai', 'borrowed'])
+                                            ->whereNull('returned_at')
                                             ->where('id', '!=', $loan->id)
                                             ->exists();
 
@@ -145,13 +151,16 @@
                             <td>{{ $no + 1 }}</td>
 
                             <td>
-                                <strong>{{ $loan->name }}</strong>
+                                <div class="borrower-heading">
+                                    <strong>{{ $loan->name }}</strong>
+                                    <span class="borrower-department">
+                                        {{ $loan->departement ?? '-' }}
+                                    </span>
+                                </div>
                                 <div class="borrower-email">
                                     {{ $loan->email ?? '-' }}
                                 </div>
                             </td>
-
-                            <td>{{ $loan->departement ?? '-' }}</td>
 
                             <td>{{ $loanItem->name ?? '-' }}</td>
 
@@ -206,6 +215,8 @@
                                 @if($loan->status === 'process')
                                     <span class="badge badge-info">Process</span>
                                 @elseif($loan->status === 'selesai')
+                                    <span class="badge badge-success">Ready for Pickup</span>
+                                @elseif($loan->status === 'borrowed')
                                     <span class="badge badge-success">Completed</span>
                                 @elseif($loan->status === 'pending')
                                     <span class="badge badge-secondary">Pending</span>
@@ -220,13 +231,7 @@
 
                             <td>
                                 <div class="action-buttons">
-                                    @if($loan->status === 'selesai')
-                                        <span class="badge badge-success loan-completed-action">
-                                            <i class="fas fa-check-circle"></i>
-                                            <span>Completed</span>
-                                        </span>
-
-                                    @elseif(
+                                    @if(
                                         $loan->status === 'process' &&
                                         $loanItem &&
                                         ($requiresHostname || $tracksSerial)
@@ -267,8 +272,6 @@
                                             </button>
                                         </form>
 
-                                    @else
-                                        <span style="color:#888;">-</span>
                                     @endif
 
                                     @if(filled($loan->public_token))
@@ -286,7 +289,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="empty-state">
+                            <td colspan="8" class="empty-state">
                                 <i class="fas fa-inbox"></i>
                                 <p>No loan data yet.</p>
                             </td>
@@ -294,7 +297,7 @@
                     @endforelse
 
                     <tr id="noLoanResults" style="display:none;">
-                        <td colspan="9" class="empty-state">
+                        <td colspan="8" class="empty-state">
                             <i class="fas fa-search"></i>
                             <p>No matching loan records found.</p>
                         </td>
@@ -304,6 +307,31 @@
         </div>
     </div>
 </div>
+
+@push('styles')
+<style>
+    .borrower-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        gap: 8px;
+        min-width: 190px;
+    }
+
+    .borrower-heading strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .borrower-department {
+        flex: 0 0 auto;
+        color: #647a3a;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-align: right;
+    }
+</style>
+@endpush
 
 {{-- EDIT LOAN MODAL --}}
 <div id="editModal" class="edit-modal" aria-hidden="true">
@@ -525,7 +553,7 @@ function resetFilters() {
 
 const urlStatus = new URLSearchParams(window.location.search).get('status');
 
-if (urlStatus && ['pending', 'process', 'selesai', 'ditolak'].includes(urlStatus)) {
+if (urlStatus && ['pending', 'process', 'selesai', 'borrowed', 'ditolak'].includes(urlStatus)) {
     document.getElementById('statusFilter').value = urlStatus;
 }
 
