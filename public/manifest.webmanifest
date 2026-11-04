@@ -1,0 +1,9 @@
+{ 
+    "name": "Portal Peminjaman IT", 
+    "short_name": "Portal IT", 
+    "start_url": "/", 
+    "display": "standalone", 
+    "background_color": "#ffffff", 
+    "theme_color": "#14532d", 
+    "icons": []
+}

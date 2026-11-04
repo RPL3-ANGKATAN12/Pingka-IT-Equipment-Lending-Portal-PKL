@@ -8,8 +8,15 @@
 
     <div class="page-header">
         <div class="page-header-container">
-            <h1>IT Items</h1>
-            <p>List of IT equipment and their current availability</p>
+            <div class="items-heading">
+                <span class="items-heading-icon" aria-hidden="true">
+                    <i class="fas fa-laptop"></i>
+                </span>
+                <div>
+                    <h1>IT Items</h1>
+                    <p>List of IT equipment and their current availability</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -17,10 +24,11 @@
         <div class="items-toolbar">
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="itemSearch" placeholder="Search item..." autocomplete="off">
+                <input type="search" id="itemSearch" placeholder="Search item..." aria-label="Search items" autocomplete="off">
             </div>
             <div class="item-total">
-                {{ $items->count() }} items
+                <i class="fas fa-cubes" aria-hidden="true"></i>
+                <span>{{ $items->count() }} items</span>
             </div>
         </div>
 
@@ -38,20 +46,23 @@
                 <tbody id="itemsTableBody">
                     @forelse($items as $item)
                         <tr class="item-row">
-                            <td>{{ $loop->iteration }}</td>
-                            <td>
+                            <td data-label="No">{{ $loop->iteration }}</td>
+                            <td data-label="Item" class="item-name-cell">
+                                <span class="item-type-icon" aria-hidden="true">
+                                    <i class="fas fa-laptop"></i>
+                                </span>
                                 <strong>{{ $item->name }}</strong>
                             </td>
-                            <td>
+                            <td data-label="Available">
                                 {{ $item->status === 'tersedia' ? $item->available : 0 }}
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 @if($item->status === 'tersedia' && $item->available > 0)
-                                    <span class="status-badge">
+                                    <span class="status-badge is-available">
                                         Available
                                     </span>
                                 @else
-                                    <span class="status-badge">
+                                    <span class="status-badge is-unavailable">
                                         Unavailable
                                     </span>
                                 @endif
@@ -59,7 +70,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="empty-table">
+                            <td colspan="4" class="empty-table">
                                 <i class="fas fa-box-open"></i>
                                 <p>No items available.</p>
                             </td>
