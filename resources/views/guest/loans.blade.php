@@ -178,6 +178,11 @@
         margin-top: 6px;
     }
 
+    .loan-data-table .loan-data-unavailable {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+    }
+
     @media (max-width: 768px) {
         .loan-data-table {
             min-width: 860px;
@@ -283,6 +288,14 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function getDeviceInfo(value) {
+    if (String(value || '').trim() !== '') {
+        return escapeHtml(value);
+    }
+
+    return `<span class="loan-data-unavailable">N/A</span>`;
+}
+
 
 function getStatusBadge(status) {
     if (status === 'pending') {
@@ -371,13 +384,13 @@ function renderTable() {
                         ${escapeHtml(loan.item || '-')}
                     </td>
                     <td>
-                        ${escapeHtml(loan.hostname || '-')}
+                        ${getDeviceInfo(loan.hostname)}
                     </td>
                     <td>
-                        ${escapeHtml(loan.type || '-')}
+                        ${getDeviceInfo(loan.type)}
                     </td>
                     <td>
-                        ${escapeHtml(loan.sn || '-')}
+                        ${getDeviceInfo(loan.sn)}
                     </td>
                     <td>
                         ${String(loan.others || '').trim()
@@ -561,9 +574,7 @@ function openDetail(loanId) {
                 Hostname
             </label>
             <p>
-                ${escapeHtml(
-                    loan.hostname || '-'
-                )}
+                ${getDeviceInfo(loan.hostname)}
             </p>
         </div>
         <div class="detail-group">
@@ -572,9 +583,7 @@ function openDetail(loanId) {
                 Type
             </label>
             <p>
-                ${escapeHtml(
-                    loan.type || '-'
-                )}
+                ${getDeviceInfo(loan.type)}
             </p>
         </div>
         <div class="detail-group">
@@ -583,9 +592,7 @@ function openDetail(loanId) {
                 Serial Number
             </label>
             <p>
-                ${escapeHtml(
-                    loan.sn || '-'
-                )}
+                ${getDeviceInfo(loan.sn)}
             </p>
         </div>
         <div class="detail-group">

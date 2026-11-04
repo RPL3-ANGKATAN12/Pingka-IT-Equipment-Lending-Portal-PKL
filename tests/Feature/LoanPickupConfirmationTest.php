@@ -41,7 +41,8 @@ class LoanPickupConfirmationTest extends TestCase
             ->assertSee(
                 'class="badge badge-warning">Please pick up your item</span>',
                 false
-            );
+            )
+            ->assertSee('N/A');
         $this->get(route('guest.loans'))
             ->assertOk()
             ->assertSee('<th>Name</th>', false)
@@ -57,12 +58,18 @@ class LoanPickupConfirmationTest extends TestCase
             ->assertSee('Confirm Pickup')
             ->assertSee('Waiting for Pickup')
             ->assertSee('class="borrower-department"', false)
-            ->assertSee('IT');
+            ->assertSee('IT')
+            ->assertSee('Not required')
+            ->assertSee('Not specified')
+            ->assertSee('Not tracked');
 
         $this->get(route('admin.loans'))
             ->assertOk()
             ->assertSee('class="borrower-department"', false)
-            ->assertSee('IT');
+            ->assertSee('IT')
+            ->assertSee('Not required')
+            ->assertSee('Not specified')
+            ->assertSee('Not tracked');
 
         $this->post(route('admin.returned-items.pickup', $loan))
             ->assertRedirect()
@@ -83,7 +90,9 @@ class LoanPickupConfirmationTest extends TestCase
         $this->get(route('loans.track', $loan->public_token))
             ->assertOk()
             ->assertSee('Peminjaman berlangsung')
-            ->assertSee('Pengambilan perangkat telah dikonfirmasi admin.');
+            ->assertSee('Pengambilan perangkat telah dikonfirmasi admin.')
+            ->assertSee('Waktu diambil')
+            ->assertSee('grid-template-columns: repeat(4, minmax(0, 1fr))', false);
 
         $this->actingAs($admin)
             ->get(route('admin.returned-items.index'))

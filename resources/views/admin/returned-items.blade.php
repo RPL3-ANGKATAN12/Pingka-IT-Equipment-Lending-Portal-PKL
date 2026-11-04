@@ -230,27 +230,36 @@
                             <td>{{ $loan->item->name ?? '-' }}</td>
 
                             <td>
-                                @if(filled($loan->sn))
-                                    <div class="device-info-line">
+                                <div class="device-info-line">
+                                    <span class="device-info-label">Hostname:</span>
+                                    @if(filled($loan->hostname))
+                                        <strong>{{ $loan->hostname }}</strong>
+                                    @else
+                                        <span class="device-info-unavailable">
+                                            {{ $loan->item?->requires_hostname ? 'Not assigned' : 'Not required' }}
+                                        </span>
+                                    @endif
+                                </div>
+
+                                <div class="device-info-line">
+                                    <span class="device-info-label">Model:</span>
+                                    @if(filled($loan->type))
+                                        <span>{{ $loan->type }}</span>
+                                    @else
+                                        <span class="device-info-unavailable">Not specified</span>
+                                    @endif
+                                </div>
+
+                                <div class="device-info-line">
+                                    <span class="device-info-label">SN:</span>
+                                    @if(filled($loan->sn))
                                         <strong>{{ $loan->sn }}</strong>
-                                    </div>
-                                @endif
-
-                                @if(filled($loan->hostname))
-                                    <div class="device-info-line">
-                                        {{ $loan->hostname }}
-                                    </div>
-                                @endif
-
-                                @if(filled($loan->type))
-                                    <div class="device-info-line">
-                                        {{ $loan->type }}
-                                    </div>
-                                @endif
-
-                                @if(!filled($loan->hostname) && !filled($loan->type) && !filled($loan->sn))
-                                    <span>-</span>
-                                @endif
+                                    @else
+                                        <span class="device-info-unavailable">
+                                            {{ $loan->item?->tracks_serial_numbers ? 'Not assigned' : 'Not tracked' }}
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
 
                             <td>
@@ -554,6 +563,20 @@
     .device-info-line {
         margin-bottom: 4px;
         overflow-wrap: anywhere;
+    }
+
+    .device-info-line:last-child {
+        margin-bottom: 0;
+    }
+
+    .device-info-label {
+        color: #526640;
+        font-weight: 600;
+    }
+
+    .device-info-unavailable {
+        color: #74816e;
+        font-size: 12px;
     }
 
     .btn-confirm-pickup {
