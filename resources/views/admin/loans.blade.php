@@ -30,7 +30,17 @@
 
         <div class="status-card" onclick="filterStatus('borrowed')" style="cursor:pointer;">
             <h4>{{ $stats['Borrowed'] ?? 0 }}</h4>
+            <p><i class="fas fa-hand-holding"></i> Borrowed</p>
+        </div>
+
+        <div class="status-card" onclick="filterStatus('completed')" style="cursor:pointer;">
+            <h4>{{ $stats['Completed'] ?? 0 }}</h4>
             <p><i class="fas fa-check-circle"></i> Completed</p>
+        </div>
+
+        <div class="status-card" onclick="filterStatus('ditolak')" style="cursor:pointer;">
+            <h4>{{ $stats['Rejected'] ?? 0 }}</h4>
+            <p><i class="fas fa-times-circle"></i> Rejected</p>
         </div>
     </div>
 
@@ -42,7 +52,8 @@
                 <option value="pending">Pending</option>
                 <option value="process">Process</option>
                 <option value="selesai">Ready for Pickup</option>
-                <option value="borrowed">Completed</option>
+                <option value="borrowed">Borrowed</option>
+                <option value="completed">Completed</option>
                 <option value="ditolak">Rejected</option>
             </select>
 
@@ -88,6 +99,7 @@
                     @forelse($loans as $no => $loan)
                         @php
                             $loanItem = $loan->item;
+                            $loanStatus = $loan->returned_at ? 'completed' : $loan->status;
 
                             $tracksSerial = (bool) (
                                 $loanItem->tracks_serial_numbers ?? false
@@ -135,7 +147,7 @@
 
                         <tr
                             class="loan-row"
-                            data-status="{{ $loan->status }}"
+                            data-status="{{ $loanStatus }}"
                             data-item="{{ strtolower($loanItem->name ?? '') }}"
                             data-search="{{ strtolower(
                                 ($loan->name ?? '') . ' ' .
@@ -223,7 +235,9 @@
                                     <span class="badge badge-info">Process</span>
                                 @elseif($loan->status === 'selesai')
                                     <span class="badge badge-success">Ready for Pickup</span>
-                                @elseif($loan->status === 'borrowed')
+                                @elseif($loanStatus === 'borrowed')
+                                    <span class="badge badge-success">Borrowed</span>
+                                @elseif($loanStatus === 'completed')
                                     <span class="badge badge-success">Completed</span>
                                 @elseif($loan->status === 'pending')
                                     <span class="badge badge-secondary">Pending</span>
@@ -275,7 +289,7 @@
 
                                             <button type="submit" class="btn-table btn-success">
                                                 <i class="fas fa-check-circle"></i>
-                                                Completed
+                                                Ready for Pickup
                                             </button>
                                         </form>
 
@@ -505,8 +519,8 @@
             <i class="fas fa-check-circle"></i>
         </div>
 
-        <h3 id="completeLoanTitle">Complete this loan?</h3>
-        <p>Are you sure you want to mark this loan as completed?</p>
+        <h3 id="completeLoanTitle">Mark this loan ready for pickup?</h3>
+        <p>Are you sure you want to mark this loan as ready for pickup?</p>
 
         <div class="portal-confirm-actions">
             <button
@@ -579,7 +593,7 @@ function resetFilters() {
 
 const urlStatus = new URLSearchParams(window.location.search).get('status');
 
-if (urlStatus && ['pending', 'process', 'selesai', 'borrowed', 'ditolak'].includes(urlStatus)) {
+if (urlStatus && ['pending', 'process', 'selesai', 'borrowed', 'completed', 'ditolak'].includes(urlStatus)) {
     document.getElementById('statusFilter').value = urlStatus;
 }
 

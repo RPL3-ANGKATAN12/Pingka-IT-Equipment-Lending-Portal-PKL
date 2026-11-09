@@ -30,7 +30,12 @@
             </div>
 
             <div class="stat-card">
-                <span class="stat-number">{{ $loans->where('status', 'borrowed')->count() }}</span>
+                <span class="stat-number">{{ $loans->where('status', 'borrowed')->whereNull('returned_at')->count() }}</span>
+                <span class="stat-label">Borrowed</span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number">{{ $loans->filter(fn ($loan) => $loan->status === 'completed' || ($loan->status === 'borrowed' && $loan->returned_at !== null))->count() }}</span>
                 <span class="stat-label">Completed</span>
             </div>
 
@@ -51,7 +56,8 @@
                     <option value="pending">Pending</option>
                     <option value="process">Process</option>
                     <option value="selesai">Please pick up your item</option>
-                    <option value="borrowed">Completed</option>
+                    <option value="borrowed">Borrowed</option>
+                    <option value="completed">Completed</option>
                     <option value="ditolak">Rejected</option>
                 </select>
                 <select id="itemFilter" class="filter-input" onchange="applyFilters()">
@@ -267,8 +273,7 @@
                 $loan->start_date
                     ? $loan->start_date->format('d/m/Y')
                     : null,
-            'status' =>
-                $loan->status,
+            'status' => $loan->returned_at ? 'completed' : $loan->status,
         ];
     })->values();
 @endphp
@@ -308,6 +313,9 @@ function getStatusBadge(status) {
         return `<span class="badge badge-warning">Please pick up your item</span>`;
     }
     if (status === 'borrowed') {
+        return `<span class="badge badge-success">Borrowed</span>`;
+    }
+    if (status === 'completed') {
         return `<span class="badge badge-success">Completed</span>`;
     }
     if (status === 'ditolak') {

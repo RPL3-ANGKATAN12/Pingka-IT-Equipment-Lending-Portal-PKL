@@ -22,7 +22,16 @@ class AdminController extends Controller
             'total_process' => Loans::where('status', 'process')->count(),
             'total_selesai' => Loans::where('status', 'selesai')->count(),
             'total_ditolak' => Loans::where('status', 'ditolak')->count(),
-            'total_borrowed' => Loans::where('status', 'borrowed')->count(),
+            'total_borrowed' => Loans::where('status', 'borrowed')
+                ->whereNull('returned_at')
+                ->count(),
+            'total_completed' => Loans::where(function ($query) {
+                $query->where('status', 'completed')
+                    ->orWhere(function ($query) {
+                        $query->where('status', 'borrowed')
+                            ->whereNotNull('returned_at');
+                    });
+            })->count(),
         ];
 
         $recentLoans = Loans::with('item')
@@ -241,11 +250,24 @@ class AdminController extends Controller
         if ($httpRequest->filled('status')) {
             $httpRequest->validate([
                 'status' => [
-                    'in:pending,process,selesai,borrowed,ditolak',
+                    'in:pending,process,selesai,borrowed,completed,ditolak',
                 ],
             ]);
 
-            $query->where('status', $httpRequest->status);
+            if ($httpRequest->status === 'completed') {
+                $query->where(function ($query) {
+                    $query->where('status', 'completed')
+                        ->orWhere(function ($query) {
+                            $query->where('status', 'borrowed')
+                                ->whereNotNull('returned_at');
+                        });
+                });
+            } elseif ($httpRequest->status === 'borrowed') {
+                $query->where('status', 'borrowed')
+                    ->whereNull('returned_at');
+            } else {
+                $query->where('status', $httpRequest->status);
+            }
         }
 
         $loans = $query->get();
@@ -254,7 +276,16 @@ class AdminController extends Controller
             'Pending' => Loans::where('status', 'pending')->count(),
             'Process' => Loans::where('status', 'process')->count(),
             'Done' => Loans::where('status', 'selesai')->count(),
-            'Borrowed' => Loans::where('status', 'borrowed')->count(),
+            'Borrowed' => Loans::where('status', 'borrowed')
+                ->whereNull('returned_at')
+                ->count(),
+            'Completed' => Loans::where(function ($query) {
+                $query->where('status', 'completed')
+                    ->orWhere(function ($query) {
+                        $query->where('status', 'borrowed')
+                            ->whereNotNull('returned_at');
+                    });
+            })->count(),
             'Rejected' => Loans::where('status', 'ditolak')->count(),
         ];
 
@@ -267,7 +298,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Save loan details and mark the loan as completed.
+     * Save loan details and mark the loan as ready for pickup.
      * Hostname is required only when the item requires it.
      */
     
@@ -292,9 +323,9 @@ class AdminController extends Controller
                     throw new \RuntimeException('Item not found.');
                 }
 
-                if (in_array($loan->status, ['selesai', 'borrowed'], true)) {
+                if (in_array($loan->status, ['selesai', 'borrowed', 'completed'], true)) {
                     throw new \RuntimeException(
-                        'Completed loans cannot be changed anymore.'
+                        'Loan details cannot be changed after the loan is ready for pickup.'
                     );
                 }
 
@@ -433,9 +464,9 @@ class AdminController extends Controller
                 $newStatus = $validated['status'];
                 $item = $loan->item;
 
-                if (in_array($oldStatus, ['selesai', 'borrowed'], true)) {
+                if (in_array($oldStatus, ['selesai', 'borrowed', 'completed'], true)) {
                     throw new \RuntimeException(
-                        'Completed loans cannot be changed anymore.'
+                        'Loan details cannot be changed after the loan is ready for pickup.'
                     );
                 }
 

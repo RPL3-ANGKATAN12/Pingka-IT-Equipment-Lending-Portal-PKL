@@ -14,19 +14,19 @@ class ReturnedItemController extends Controller
     public function index()
     {
         $loans = Loans::with('item')
-            ->whereIn('status', ['selesai', 'borrowed'])
+            ->whereIn('status', ['selesai', 'borrowed', 'completed'])
             ->whereHas('item')
             ->orderByRaw('returned_at IS NOT NULL')
             ->orderByDesc('id')
             ->get();
 
         $stats = [
-            'not_returned' => Loans::whereIn('status', ['selesai', 'borrowed'])
+            'not_returned' => Loans::whereIn('status', ['selesai', 'borrowed', 'completed'])
                 ->whereNull('returned_at')
                 ->whereHas('item')
                 ->count(),
 
-            'returned' => Loans::whereIn('status', ['selesai', 'borrowed'])
+            'returned' => Loans::whereIn('status', ['selesai', 'borrowed', 'completed'])
                 ->whereNotNull('returned_at')
                 ->whereHas('item')
                 ->count(),
@@ -114,6 +114,7 @@ class ReturnedItemController extends Controller
             // Simpan tanggal jatuh tempo dan waktu pengembalian.
             $lockedLoan->due_date = $validated['due_date'];
             $lockedLoan->returned_at = now();
+            $lockedLoan->status = 'completed';
             $lockedLoan->save();
 
             // Jika item menggunakan Serial Number, bebaskan SN yang dikembalikan.

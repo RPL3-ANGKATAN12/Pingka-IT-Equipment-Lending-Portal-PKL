@@ -83,10 +83,10 @@ class LoanPickupConfirmationTest extends TestCase
 
         $this->get(route('guest.loans'))
             ->assertOk()
-            ->assertSee('class="badge badge-success">Completed</span>', false);
+            ->assertSee('class="badge badge-success">Borrowed</span>', false);
         $this->get(route('admin.loans'))
             ->assertOk()
-            ->assertSee('class="badge badge-success">Completed</span>', false);
+            ->assertSee('class="badge badge-success">Borrowed</span>', false);
         $this->get(route('loans.track', $loan->public_token))
             ->assertOk()
             ->assertSee('Peminjaman berlangsung')
@@ -138,5 +138,60 @@ class LoanPickupConfirmationTest extends TestCase
             'status' => 'selesai',
             'returned_at' => null,
         ]);
+    }
+
+    public function test_confirming_return_changes_status_to_completed_on_both_loan_pages(): void
+    {
+        $admin = User::create([
+            'nama' => 'Portal Admin',
+            'email' => 'admin@example.test',
+            'password' => 'test-password',
+            'role' => 'admin',
+        ]);
+        $item = Item::create([
+            'name' => 'Borrowed laptop',
+            'available' => 0,
+            'status' => 'dipinjam',
+        ]);
+        $loan = Loans::create([
+            'public_token' => str_repeat('i', 40),
+            'name' => 'Borrower',
+            'email' => 'borrower@example.test',
+            'departement' => 'IT',
+            'item_id' => $item->id,
+            'start_date' => '2026-11-03',
+            'due_date' => '2026-11-10',
+            'status' => 'borrowed',
+            'picked_up_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.returned-items.return', $loan), [
+                'returned' => '1',
+                'due_date' => '2026-11-10',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('loans', [
+            'id' => $loan->id,
+            'status' => 'completed',
+        ]);
+        $this->assertNotNull($loan->fresh()->returned_at);
+
+        $this->get(route('guest.loans'))
+            ->assertOk()
+            ->assertSee('value="completed">Completed</option>', false)
+            ->assertSee('"status":"completed"', false);
+
+        $this->get(route('admin.loans'))
+            ->assertOk()
+            ->assertSee('value="completed">Completed</option>', false)
+            ->assertSee('data-status="completed"', false)
+            ->assertSee('>Completed</span>', false);
+
+        $this->get(route('admin.loans', ['status' => 'completed']))
+            ->assertOk()
+            ->assertSee('data-status="completed"', false);
     }
 }

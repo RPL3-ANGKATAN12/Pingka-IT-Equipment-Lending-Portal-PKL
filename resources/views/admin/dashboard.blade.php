@@ -132,6 +132,10 @@
                         <span class="activity-badge badge-completed">
                             <i class="fas fa-check-circle"></i> Ready for Pickup
                         </span>
+                    @elseif($loan->status === 'completed' || ($loan->status === 'borrowed' && $loan->returned_at))
+                        <span class="activity-badge badge-completed">
+                            <i class="fas fa-check-circle"></i> Completed
+                        </span>
                     @elseif($loan->status === 'borrowed')
                         <span class="activity-badge badge-process">
                             <i class="fas fa-hand-holding"></i> Borrowed
