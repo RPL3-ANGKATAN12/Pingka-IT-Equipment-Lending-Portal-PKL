@@ -85,6 +85,9 @@
                 <a href="{{ route('admin.returned-items.index') }}" class="{{ request()->routeIs('admin.returned*') ? 'active' : '' }}">
                     <i class="fas fa-box-open"></i>Return
                 </a>
+                <a href="{{ route('admin.reports') }}" class="{{ request()->routeIs('admin.reports*') ? 'active' : '' }}">
+                    <i class="fas fa-file-alt"></i>Reports
+                </a>
             </div>
         @endif
     @endauth

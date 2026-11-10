@@ -13,11 +13,6 @@
 
     {{-- STATISTICS --}}
     <div class="stats-grid">
-        <div class="status-card" onclick="filterStatus('pending')" style="cursor:pointer;">
-            <h4>{{ $stats['Pending'] ?? 0 }}</h4>
-            <p><i class="fas fa-clock"></i> Pending</p>
-        </div>
-
         <div class="status-card proses" onclick="filterStatus('process')" style="cursor:pointer;">
             <h4>{{ $stats['Process'] ?? 0 }}</h4>
             <p><i class="fas fa-spinner"></i> Process</p>
@@ -36,11 +31,6 @@
         <div class="status-card" onclick="filterStatus('completed')" style="cursor:pointer;">
             <h4>{{ $stats['Completed'] ?? 0 }}</h4>
             <p><i class="fas fa-check-circle"></i> Completed</p>
-        </div>
-
-        <div class="status-card" onclick="filterStatus('ditolak')" style="cursor:pointer;">
-            <h4>{{ $stats['Rejected'] ?? 0 }}</h4>
-            <p><i class="fas fa-times-circle"></i> Rejected</p>
         </div>
     </div>
 

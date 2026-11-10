@@ -23,13 +23,6 @@
         </div>
     @endif
 
-    @if(session('success'))
-        <div class="borrowed-alert borrowed-alert-success">
-            <i class="fas fa-check-circle"></i>
-            <span>{{ session('success') }}</span>
-        </div>
-    @endif
-
     @if($errors->any())
         <div class="borrowed-alert borrowed-alert-error">
             <i class="fas fa-exclamation-triangle"></i>
@@ -181,14 +174,6 @@
                 Reset
             </button>
 
-            <button
-                type="button"
-                class="btn-print-returned"
-                onclick="printReturnedItems()"
-            >
-                <i class="fas fa-print"></i>
-                Print Data
-            </button>
         </div>
 
         <div class="table-container">
@@ -677,34 +662,6 @@
         display: none !important;
     }
 
-    @media print {
-        .borrowed-header,
-        .stats-grid,
-        .filter-bar,
-        .return-modal-overlay,
-        .return-status-cell button,
-        .btn-confirm-pickup {
-            display: none !important;
-        }
-
-        .return-date-picker-button,
-        .native-date-picker {
-            display: none !important;
-        }
-
-        #noReturnedResults,
-        .returned-row[style*="display: none"] {
-            display: none !important;
-        }
-
-        .due-date-cell input {
-            display: none !important;
-        }
-
-        .due-date-cell::after {
-            content: attr(data-print-date);
-        }
-    }
 </style>
 @endpush
 
@@ -791,20 +748,6 @@ function resetFilters() {
     document.getElementById('toMonthFilter').value = '';
     document.getElementById('searchFilter').value = '';
     applyFilters();
-}
-
-function printReturnedItems() {
-    applyFilters();
-
-    document.querySelectorAll('.due-date-cell').forEach(function (cell) {
-        const input = cell.querySelector('.return-due-date-input');
-
-        if (input) {
-            cell.dataset.printDate = input.value || '-';
-        }
-    });
-
-    window.print();
 }
 
 function parseDisplayDate(value) {
@@ -1091,12 +1034,6 @@ document.getElementById('returnConfirmForm').addEventListener(
             '<i class="fas fa-spinner fa-spin"></i> Processing...';
     }
 );
-
-window.addEventListener('afterprint', function () {
-    document.querySelectorAll('.due-date-cell').forEach(function (cell) {
-        delete cell.dataset.printDate;
-    });
-});
 
 const urlStatus = new URLSearchParams(window.location.search).get('status');
 
