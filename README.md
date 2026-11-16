@@ -1,27 +1,26 @@
-
 # IT Equipment Lending Portal
 
-Aplikasi berbasis web untuk pengelolaan inventaris dan peminjaman equipment IT.
+A web application for managing IT equipment inventory and loan requests.
 
-## Tujuan
-Projek Praktik Kerja Lapangan (PKL) di PT Ecogreen Oleochemicals Batam.
+## Purpose
+Developed as part of an internship project at PT Ecogreen Oleochemicals Batam.
 
-## Teknologi
+## Technology
 - Laravel
 - PHP
 - MySQL
-- HTML, CSS, dan JavaScript
+- HTML, CSS, and JavaScript
 
-## Fitur
-- Login admin
-- Pengelolaan data barang
-- Pengajuan dan pengelolaan peminjaman
-- Pengelolaan pengembalian barang
+## Features
+- Admin login
+- Equipment inventory management
+- Loan request submission and management
+- Equipment return management
 
-## Menjalankan aplikasi
-1. Jalankan `composer install`.
-2. Salin `.env.example` menjadi `.env`.
-3. Atur koneksi database pada `.env`.
-4. Jalankan `php artisan key:generate`.
-5. Jalankan `php artisan migrate`.
-6. Jalankan `php artisan serve`.
+## Running the application
+1. Run `composer install`.
+2. Copy `.env.example` to `.env`.
+3. Configure the database connection in `.env`.
+4. Run `php artisan key:generate`.
+5. Run `php artisan migrate`.
+6. Run `php artisan serve`.

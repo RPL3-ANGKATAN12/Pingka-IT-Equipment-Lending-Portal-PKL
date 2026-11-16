@@ -55,7 +55,7 @@
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
                     <option value="process">Process</option>
-                    <option value="selesai">Please pick up your item</option>
+                    <option value="selesai">Ready for Pickup</option>
                     <option value="borrowed">Borrowed</option>
                     <option value="completed">Completed</option>
                     <option value="ditolak">Rejected</option>
@@ -310,7 +310,7 @@ function getStatusBadge(status) {
         return `<span class="badge badge-info">Process</span>`;
     }
     if (status === 'selesai') {
-        return `<span class="badge badge-warning">Please pick up your item</span>`;
+        return `<span class="badge badge-warning">Ready for Pickup</span>`;
     }
     if (status === 'borrowed') {
         return `<span class="badge badge-success">Borrowed</span>`;

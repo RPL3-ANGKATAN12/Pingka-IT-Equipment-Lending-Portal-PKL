@@ -260,7 +260,7 @@ class AdminRequestApprovalTest extends TestCase
                 'sn' => 'SERIAL-001',
             ])
             ->assertRedirect()
-            ->assertSessionHas('error', 'Hostname wajib diisi untuk barang ini.');
+            ->assertSessionHas('error', 'A hostname is required for this item.');
 
         $this->assertDatabaseHas('loans', [
             'id' => $loan->id,

@@ -16,31 +16,18 @@ class ItemController extends Controller
 {
     public function index()
     {
-        $items = Item::with('serialNumbers')
+        $items = Item::with([
+            'serialNumbers',
+            'loans' => fn ($query) => $query
+                ->whereIn('status', ['process', 'selesai', 'borrowed'])
+                ->whereNull('returned_at')
+                ->select(['id', 'item_id', 'sn', 'status', 'returned_at']),
+        ])
             ->orderBy('name')
             ->get();
 
-        $activeLoanSerials = Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
-            ->whereNull('returned_at')
-            ->whereNotNull('sn')
-            ->pluck('sn')
-            ->map(fn ($sn) => mb_strtolower(trim($sn)))
-            ->all();
-
         foreach ($items as $item) {
-            if (!$item->tracks_serial_numbers) {
-                continue;
-            }
-
-            $item->available = $item->serialNumbers->filter(
-                fn ($serial) =>
-                    $serial->status === 'available'
-                    && !in_array(
-                        mb_strtolower(trim($serial->serial_number)),
-                        $activeLoanSerials,
-                        true
-                    )
-            )->count();
+            $item->syncInventoryAvailability();
         }
 
         return view('admin.item', compact('items'));
@@ -80,13 +67,13 @@ class ItemController extends Controller
 
         if (!$trackingEnabled && $serialNumbers->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'serial_numbers' => 'Aktifkan pelacakan Serial Number untuk menambahkan nomor seri.',
+                'serial_numbers' => 'Enable Serial Number tracking to add serial numbers.',
             ]);
         }
 
         if ($serialNumbers->count() > $targetStock) {
             throw ValidationException::withMessages([
-                'serial_numbers' => 'Jumlah Serial Number tidak boleh melebihi Target Stock.',
+                'serial_numbers' => 'The number of serial numbers cannot exceed the target stock.',
             ]);
         }
 
@@ -95,7 +82,7 @@ class ItemController extends Controller
 
         if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
             throw ValidationException::withMessages([
-                'serial_numbers' => 'Serial Number yang dimasukkan tidak boleh duplikat.',
+                'serial_numbers' => 'Serial numbers must not be duplicated.',
             ]);
         }
 
@@ -160,7 +147,7 @@ class ItemController extends Controller
 
         if ($normalizedSerialNumbers->unique()->count() !== $normalizedSerialNumbers->count()) {
             throw ValidationException::withMessages([
-                'serial_numbers' => 'Serial Number yang dimasukkan tidak boleh duplikat.',
+                'serial_numbers' => 'Serial numbers must not be duplicated.',
             ]);
         }
 
@@ -171,7 +158,7 @@ class ItemController extends Controller
 
             if (!$trackingEnabled && $newSerialNumbers->isNotEmpty()) {
                 throw ValidationException::withMessages([
-                    'serial_numbers' => 'Aktifkan pelacakan Serial Number untuk menambahkan nomor seri.',
+                    'serial_numbers' => 'Enable Serial Number tracking to add serial numbers.',
                 ]);
             }
 
@@ -197,7 +184,7 @@ class ItemController extends Controller
                 $normalizedSerialNumbers->intersect($registeredSerialsNormalized)->isNotEmpty()
             ) {
                 throw ValidationException::withMessages([
-                    'serial_numbers' => 'Serial Number yang sudah terdaftar tidak perlu dimasukkan ulang.',
+                    'serial_numbers' => 'Already registered serial numbers do not need to be entered again.',
                 ]);
             }
 
@@ -207,13 +194,13 @@ class ItemController extends Controller
             ) {
                 return redirect()
                     ->route('admin.items.index')
-                    ->with('error', 'Target Stock tidak boleh kurang dari jumlah SN yang sudah terdaftar dan ditambahkan.');
+                    ->with('error', 'Target stock cannot be less than the number of registered and newly added serial numbers.');
             }
 
             if (!$trackingEnabled && $targetStock < $activeLoans->count()) {
                 return redirect()
                     ->route('admin.items.index')
-                    ->with('error', 'Target Stock tidak boleh kurang dari jumlah barang yang sedang dipinjam.');
+                    ->with('error', 'Target stock cannot be less than the number of items currently on loan.');
             }
 
             if ($trackingEnabled && $newSerialNumbers->isNotEmpty()) {
@@ -246,6 +233,7 @@ class ItemController extends Controller
             }
 
             $item->update($validated);
+            $item->syncInventoryAvailability();
 
             return redirect()
                 ->route('admin.items.index')
@@ -309,7 +297,7 @@ class ItemController extends Controller
 
             if ($registeredCount >= $targetStock) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'serial_number' => 'Target Stock sudah tercapai. Tambah Target Stock terlebih dahulu.',
+                    'serial_number' => 'The target stock limit has been reached. Increase the target stock first.',
                 ]);
             }
 
@@ -319,27 +307,7 @@ class ItemController extends Controller
                 'status' => 'available',
             ]);
 
-            $activeLoanSerials = Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
-                ->whereNull('returned_at')
-                ->whereNotNull('sn')
-                ->pluck('sn')
-                ->map(fn ($sn) => mb_strtolower(trim($sn)))
-                ->all();
-
-            $availableCount = $lockedItem->serialNumbers()
-                ->where('status', 'available')
-                ->get()
-                ->filter(fn ($serial) => !in_array(
-                    mb_strtolower(trim($serial->serial_number)),
-                    $activeLoanSerials,
-                    true
-                ))
-                ->count();
-
-            $lockedItem->update([
-                'available' => $availableCount,
-                'status' => $availableCount > 0 ? 'tersedia' : 'dipinjam',
-            ]);
+            $lockedItem->syncInventoryAvailability();
         });
 
         return redirect()
@@ -368,16 +336,7 @@ class ItemController extends Controller
         $item = $serialNumber->item;
         $serialNumber->delete();
 
-        if ($item->tracks_serial_numbers) {
-            $availableCount = $item->serialNumbers()
-                ->where('status', 'available')
-                ->count();
-
-            $item->update([
-                'available' => $availableCount,
-                'status' => $availableCount > 0 ? 'tersedia' : 'dipinjam',
-            ]);
-        }
+        $item->syncInventoryAvailability();
 
         return redirect()
             ->route('admin.items.index')
@@ -386,21 +345,12 @@ class ItemController extends Controller
 
     public function destroy(Item $item)
     {
-        if ($item->loans()->exists()) {
+        if ($item->loans()->whereNotIn('status', ['completed', 'ditolak'])->exists()) {
             return redirect()
                 ->route('admin.items.index')
                 ->with(
                     'error',
-                    'This item cannot be deleted because it has loan history.'
-                );
-        }
-
-        if ($item->serialNumbers()->where('status', 'borrowed')->exists()) {
-            return redirect()
-                ->route('admin.items.index')
-                ->with(
-                    'error',
-                    'This item has a serial number that is currently borrowed.'
+                    'This item cannot be deleted while it has active loans or requests.'
                 );
         }
 
@@ -435,7 +385,7 @@ class ItemController extends Controller
 
                 if ($serialNumber === '' || $hostname === '') {
                     throw ValidationException::withMessages([
-                        'serial_numbers' => 'Isi setiap baris dengan format Serial Number - Hostname.',
+                        'serial_numbers' => 'Enter each line in the format Serial Number - Hostname.',
                     ]);
                 }
             } else {
@@ -444,13 +394,13 @@ class ItemController extends Controller
 
             if (mb_strlen($serialNumber) > 150) {
                 throw ValidationException::withMessages([
-                    'serial_numbers' => 'Setiap Serial Number maksimal 150 karakter.',
+                    'serial_numbers' => 'Each serial number must be no more than 150 characters.',
                 ]);
             }
 
             if ($hostname !== null && mb_strlen($hostname) > 100) {
                 throw ValidationException::withMessages([
-                    'serial_numbers' => 'Setiap Hostname maksimal 100 karakter.',
+                    'serial_numbers' => 'Each hostname must be no more than 100 characters.',
                 ]);
             }
 

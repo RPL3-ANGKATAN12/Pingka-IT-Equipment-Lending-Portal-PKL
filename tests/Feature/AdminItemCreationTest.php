@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\Loans;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -393,6 +394,75 @@ class AdminItemCreationTest extends TestCase
             'item_id' => $item->id,
             'serial_number' => 'LAPTOP-001',
             'hostname' => 'IT-LAPTOP-001',
+        ]);
+    }
+
+    public function test_inventory_page_reconciles_available_stock_with_active_loans(): void
+    {
+        $admin = $this->createAdmin();
+        $trackedItem = Item::create([
+            'name' => 'Tracked Monitor',
+            'available' => 6,
+            'target_stock' => 6,
+            'tracks_serial_numbers' => true,
+            'status' => 'tersedia',
+        ]);
+        $trackedItem->serialNumbers()->createMany(
+            collect(range(1, 6))->map(fn ($number) => [
+                'serial_number' => 'MONITOR-'.$number,
+                'status' => 'available',
+            ])->all()
+        );
+
+        foreach (['a', 'b'] as $token) {
+            Loans::create([
+                'public_token' => str_repeat($token, 40),
+                'name' => 'Borrower',
+                'email' => $token.'@example.test',
+                'departement' => 'IT',
+                'item_id' => $trackedItem->id,
+                'start_date' => '2026-11-03',
+                'status' => 'process',
+            ]);
+        }
+
+        $untrackedItem = Item::create([
+            'name' => 'Wired Mouse',
+            'available' => 6,
+            'target_stock' => 8,
+            'tracks_serial_numbers' => false,
+            'status' => 'tersedia',
+        ]);
+        Loans::create([
+            'public_token' => str_repeat('c', 40),
+            'name' => 'Borrower',
+            'email' => 'c@example.test',
+            'departement' => 'IT',
+            'item_id' => $untrackedItem->id,
+            'start_date' => '2026-11-03',
+            'status' => 'process',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.items.index'))
+            ->assertOk();
+
+        $this->assertMatchesRegularExpression(
+            '/In Use:\s*<strong>2<\/strong>.*?Available:\s*<strong[^>]*>\s*4/s',
+            $response->getContent()
+        );
+        $this->assertMatchesRegularExpression(
+            '/In Use:\s*<strong>1<\/strong>.*?Available:\s*<strong[^>]*>\s*7/s',
+            $response->getContent()
+        );
+
+        $this->assertDatabaseHas('items', [
+            'id' => $trackedItem->id,
+            'available' => 4,
+        ]);
+        $this->assertDatabaseHas('items', [
+            'id' => $untrackedItem->id,
+            'available' => 7,
         ]);
     }
 

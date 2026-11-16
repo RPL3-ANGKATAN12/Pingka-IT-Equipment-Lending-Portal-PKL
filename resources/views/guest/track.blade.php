@@ -370,38 +370,38 @@
 
     $statusDetails = match (true) {
         $isRejected => [
-            'label' => 'Permintaan ditolak',
-            'description' => 'Permintaan peminjaman ini tidak dapat diproses.',
+        'label' => 'Request rejected',
+        'description' => 'This loan request cannot be processed.',
             'class' => 'is-danger',
             'icon' => 'fa-circle-xmark',
         ],
         $isReturned => [
-            'label' => 'Barang telah dikembalikan',
-            'description' => 'Pengembalian barang sudah tercatat. Terima kasih!',
+            'label' => 'Item returned',
+            'description' => 'The item return has been recorded. Thank you!',
             'class' => '',
             'icon' => 'fa-circle-check',
         ],
         $isPrepared => [
-            'label' => 'Perangkat siap diambil',
-            'description' => 'Perangkat telah disiapkan. Silakan ambil barang Anda.',
+            'label' => 'Ready for pickup',
+            'description' => 'Your item is ready. Please pick it up.',
             'class' => 'is-warning',
             'icon' => 'fa-hand',
         ],
         $isBorrowed => [
-            'label' => 'Peminjaman berlangsung',
-            'description' => 'Admin telah mengonfirmasi bahwa perangkat sudah diambil.',
+            'label' => 'Currently borrowed',
+            'description' => 'The admin has confirmed that the item has been picked up.',
             'class' => '',
             'icon' => 'fa-laptop',
         ],
         $status === 'process' => [
-            'label' => 'Sedang diproses',
-            'description' => 'Permintaan disetujui. Admin sedang menyiapkan perangkat.',
+            'label' => 'Being prepared',
+            'description' => 'Your request has been approved. The admin is preparing the item.',
             'class' => 'is-warning',
             'icon' => 'fa-hourglass-half',
         ],
         default => [
-            'label' => 'Menunggu proses',
-            'description' => 'Permintaan peminjaman sedang menunggu tindak lanjut admin.',
+            'label' => 'Awaiting approval',
+            'description' => 'Your loan request is waiting for the admin to review it.',
             'class' => 'is-warning',
             'icon' => 'fa-clock',
         ],
@@ -410,8 +410,8 @@
 
 <div class="loan-tracking">
     <header class="tracking-heading">
-        <h2>Tracking Peminjaman</h2>
-        <p>Pantau status dan jadwal peminjaman perangkat Anda.</p>
+        <h2>Loan Tracking</h2>
+        <p>Track the status and schedule of your equipment loan.</p>
     </header>
 
     <article class="tracking-card">
@@ -420,8 +420,8 @@
                 <i class="fas fa-laptop"></i>
             </div>
             <div class="tracking-summary-content">
-                <p class="tracking-label">Perangkat yang dipinjam</p>
-                <h3 id="tracking-item-name">{{ $loan->item->name ?? 'Perangkat tidak tersedia' }}</h3>
+                <p class="tracking-label">Borrowed item</p>
+                <h3 id="tracking-item-name">{{ $loan->item->name ?? 'Item unavailable' }}</h3>
                 <p class="tracking-description">{{ $statusDetails['description'] }}</p>
                 <span class="tracking-status {{ $statusDetails['class'] }}">
                     <i class="fas {{ $statusDetails['icon'] }}" aria-hidden="true"></i>
@@ -431,12 +431,12 @@
         </section>
 
         <section class="tracking-section" aria-labelledby="tracking-progress-title">
-            <h4 id="tracking-progress-title">Progres peminjaman</h4>
+            <h4 id="tracking-progress-title">Loan progress</h4>
 
             @if($isRejected)
                 <div class="tracking-rejected">
                     <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-                    <span>Status akhir permintaan ini adalah ditolak. Silakan hubungi admin jika membutuhkan informasi lebih lanjut.</span>
+                    <span>This request has been rejected. Please contact the admin if you need more information.</span>
                 </div>
             @else
                 <ol class="tracking-timeline" style="--tracking-progress: {{ $trackingProgress }};">
@@ -448,8 +448,8 @@
                                 1
                             @endif
                         </span>
-                        <strong>{{ $status === 'pending' ? 'Permintaan diterima' : 'Permintaan disetujui' }}</strong>
-                        <span>Permintaan masuk ke proses peminjaman.</span>
+                        <strong>{{ $status === 'pending' ? 'Request received' : 'Request approved' }}</strong>
+                        <span>Your request has entered the loan process.</span>
                     </li>
                     <li class="tracking-step {{ $isPrepared || $isBorrowed || $isReturned ? 'is-complete' : ($status === 'process' ? 'is-current' : '') }}">
                         <span class="tracking-step-marker" aria-hidden="true">
@@ -459,8 +459,8 @@
                                 2
                             @endif
                         </span>
-                        <strong>Perangkat disiapkan</strong>
-                        <span>Admin menyiapkan perangkat untuk dipinjam.</span>
+                        <strong>Item prepared</strong>
+                        <span>The admin is preparing the item for pickup.</span>
                     </li>
                     <li class="tracking-step {{ $isBorrowed || $isReturned ? 'is-complete' : ($isPrepared ? 'is-current' : '') }}">
                         <span class="tracking-step-marker" aria-hidden="true">
@@ -470,8 +470,8 @@
                                 3
                             @endif
                         </span>
-                        <strong>Pengambilan perangkat</strong>
-                        <span>{{ $isBorrowed || $isReturned ? 'Pengambilan perangkat telah dikonfirmasi admin.' : 'Silakan ambil perangkat yang telah disiapkan.' }}</span>
+                        <strong>Item pickup</strong>
+                        <span>{{ $isBorrowed || $isReturned ? 'The admin has confirmed the item pickup.' : 'Please pick up the prepared item.' }}</span>
                     </li>
                     <li class="tracking-step {{ $isReturned ? 'is-complete' : ($isBorrowed ? 'is-current' : '') }}">
                         <span class="tracking-step-marker" aria-hidden="true">
@@ -481,21 +481,21 @@
                                 4
                             @endif
                         </span>
-                        <strong>Pengembalian</strong>
-                        <span>{{ $isReturned ? 'Pengembalian sudah dicatat.' : ($isBorrowed ? 'Menunggu perangkat dikembalikan.' : 'Pengembalian dimulai setelah perangkat diambil.') }}</span>
+                        <strong>Return</strong>
+                        <span>{{ $isReturned ? 'The return has been recorded.' : ($isBorrowed ? 'Waiting for the item to be returned.' : 'The return process begins after the item is picked up.') }}</span>
                     </li>
                 </ol>
             @endif
         </section>
 
         <section class="tracking-section" aria-labelledby="tracking-dates-title">
-            <h4 id="tracking-dates-title">Informasi tanggal</h4>
+            <h4 id="tracking-dates-title">Dates</h4>
             <div class="tracking-dates">
                 <div class="tracking-date">
                     <i class="fas fa-calendar-day" aria-hidden="true"></i>
                     <div>
-                        <span>Tanggal mulai</span>
-                        <strong>{{ $loan->start_date?->format('d M Y') ?? 'Belum ditentukan' }}</strong>
+                        <span>Start date</span>
+                        <strong>{{ $loan->start_date?->format('d M Y') ?? 'Not set' }}</strong>
                     </div>
                 </div>
 
@@ -503,7 +503,7 @@
                     <div class="tracking-date">
                         <i class="fas fa-calendar-check" aria-hidden="true"></i>
                         <div>
-                            <span>Batas pengembalian</span>
+                            <span>Return due date</span>
                             <strong>{{ $loan->due_date->format('d M Y') }}</strong>
                         </div>
                     </div>
@@ -513,7 +513,7 @@
                     <div class="tracking-date">
                         <i class="fas fa-hand" aria-hidden="true"></i>
                         <div>
-                            <span>Waktu diambil</span>
+                            <span>Pickup time</span>
                             <strong>{{ $loan->picked_up_at->format('d M Y, H:i') }}</strong>
                         </div>
                     </div>
@@ -523,7 +523,7 @@
                     <div class="tracking-date">
                         <i class="fas fa-circle-check" aria-hidden="true"></i>
                         <div>
-                            <span>Waktu dikembalikan</span>
+                            <span>Return time</span>
                             <strong>{{ $loan->returned_at->format('d M Y, H:i') }}</strong>
                         </div>
                     </div>
@@ -533,8 +533,8 @@
     </article>
 
     <footer class="tracking-footer">
-        <span>Informasi status diperbarui oleh admin.</span>
-        <a href="{{ route('guest.loans') }}">Lihat data peminjaman <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+        <span>Status information is updated by the admin.</span>
+        <a href="{{ route('guest.loans') }}">View loan data <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
     </footer>
 </div>
 @endsection

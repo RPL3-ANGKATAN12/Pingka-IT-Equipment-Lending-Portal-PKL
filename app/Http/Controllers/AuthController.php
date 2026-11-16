@@ -28,6 +28,8 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'nama' => 'required|string',
             'password' => 'required|string',
+        ], [], [
+            'nama' => 'name',
         ]);
 
         if (Auth::attempt([
@@ -39,7 +41,7 @@ class AuthController extends Controller
 
             return redirect()
                 ->route('admin.dashboard')
-                ->with('success', 'Succesfully logged in as admin.');
+                ->with('success', 'Successfully logged in as admin.');
         }
 
         return back()
@@ -56,6 +58,6 @@ class AuthController extends Controller
 
         return redirect()
             ->route('guest.home')
-            ->with('success', 'Succesfully logged out.');
+            ->with('success', 'Successfully logged out.');
     }
 }

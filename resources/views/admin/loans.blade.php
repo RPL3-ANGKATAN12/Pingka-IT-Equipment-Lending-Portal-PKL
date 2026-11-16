@@ -624,7 +624,7 @@ function openEditModal(
     document.getElementById('editItemName').textContent =
         'Item: ' + (itemName || '-');
 
-    // Tampilkan hostname hanya jika item membutuhkannya.
+    // Show the hostname field only when the item requires it.
     hostnameField.style.display = requiresHostname ? '' : 'none';
     hostnameInput.required = Boolean(requiresHostname);
     hostnameInput.disabled = !requiresHostname;
@@ -636,7 +636,7 @@ function openEditModal(
     document.getElementById('hostnameRequiredMark').textContent =
         requiresHostname ? '*' : '';
 
-    // Tampilkan dropdown SN hanya jika item menggunakan serial number.
+    // Show the Serial Number dropdown only when the item tracks serial numbers.
     serialField.style.display = tracksSerial ? '' : 'none';
     serialSelect.required = Boolean(tracksSerial);
     serialSelect.disabled = !tracksSerial;
@@ -644,7 +644,7 @@ function openEditModal(
     document.getElementById('serialRequiredMark').textContent =
         tracksSerial ? '*' : '';
 
-    // Bangun ulang pilihan SN.
+    // Rebuild the Serial Number options.
     serialSelect.replaceChildren();
 
     const placeholder = document.createElement('option');
@@ -689,8 +689,7 @@ function openEditModal(
 
     typeInput.value = type || '';
 
-    // Tidak ada pesan tambahan seperti "Select SN..." atau
-    // "Hostname tidak diperlukan untuk item ini".
+    // No additional messages are displayed when the hostname is not required.
 
     form.action = `/admin/loans/${loanId}`;
 

@@ -43,17 +43,17 @@ class ReturnedItemController extends Controller
         ]);
 
         if (!in_array($loan->status, ['selesai', 'borrowed'], true)) {
-            return back()->with('error', 'Tanggal pengembalian hanya dapat diatur setelah persiapan peminjaman selesai.');
+            return back()->with('error', 'The return due date can only be set after loan preparation is complete.');
         }
 
         if ($loan->returned_at !== null) {
-            return back()->with('error', 'Tanggal tidak dapat diubah karena barang sudah dikembalikan.');
+            return back()->with('error', 'The date cannot be changed because the item has already been returned.');
         }
 
         $loan->due_date = $validated['due_date'];
         $loan->save();
 
-        return back()->with('success', 'Tanggal batas pengembalian berhasil disimpan.');
+        return back()->with('success', 'The return due date was saved successfully.');
     }
 
     public function confirmPickup(Loans $loan)
@@ -65,13 +65,13 @@ class ReturnedItemController extends Controller
 
             if ($lockedLoan->status !== 'selesai') {
                 throw ValidationException::withMessages([
-                    'pickup' => 'Peminjaman ini tidak sedang menunggu pengambilan.',
+                    'pickup' => 'This loan is not waiting for pickup.',
                 ]);
             }
 
             if ($lockedLoan->returned_at !== null) {
                 throw ValidationException::withMessages([
-                    'pickup' => 'Barang ini sudah dikembalikan.',
+                    'pickup' => 'This item has already been returned.',
                 ]);
             }
 
@@ -80,7 +80,7 @@ class ReturnedItemController extends Controller
             $lockedLoan->save();
         });
 
-        return back()->with('success', 'Pengambilan barang berhasil dikonfirmasi.');
+        return back()->with('success', 'Item pickup confirmed successfully.');
     }
 
     public function markReturned(Request $request, Loans $loan)
@@ -97,13 +97,13 @@ class ReturnedItemController extends Controller
 
             if ($lockedLoan->status !== 'borrowed') {
                 throw ValidationException::withMessages([
-                    'returned' => 'Pengambilan barang belum dikonfirmasi.',
+                    'returned' => 'Item pickup has not been confirmed.',
                 ]);
             }
 
             if ($lockedLoan->returned_at !== null) {
                 throw ValidationException::withMessages([
-                    'returned' => 'Barang ini sudah dikonfirmasi kembali.',
+                    'returned' => 'This item has already been confirmed as returned.',
                 ]);
             }
 
@@ -111,17 +111,17 @@ class ReturnedItemController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // Simpan tanggal jatuh tempo dan waktu pengembalian.
+            // Save the due date and return time.
             $lockedLoan->due_date = $validated['due_date'];
             $lockedLoan->returned_at = now();
             $lockedLoan->status = 'completed';
             $lockedLoan->save();
 
-            // Jika item menggunakan Serial Number, bebaskan SN yang dikembalikan.
+            // Release the returned serial number for serial-number-tracked items.
             if ($item->tracks_serial_numbers) {
                 if (blank($lockedLoan->sn)) {
                     throw ValidationException::withMessages([
-                        'returned' => 'Serial Number pada transaksi ini belum diisi.',
+                        'returned' => 'No serial number has been assigned to this transaction.',
                     ]);
                 }
 
@@ -132,11 +132,11 @@ class ReturnedItemController extends Controller
 
                 if (!$serial) {
                     throw ValidationException::withMessages([
-                        'returned' => 'Serial Number tidak ditemukan pada inventaris barang.',
+                        'returned' => 'The serial number was not found in the item inventory.',
                     ]);
                 }
 
-                // Jangan membebaskan SN jika transaksi lain masih menggunakannya.
+                // Do not release the serial number while another transaction is using it.
                 $usedByAnotherLoan = Loans::where('item_id', $item->id)
                     ->where('sn', $lockedLoan->sn)
                     ->where('id', '!=', $lockedLoan->id)
@@ -146,32 +146,16 @@ class ReturnedItemController extends Controller
 
                 if ($usedByAnotherLoan) {
                     throw ValidationException::withMessages([
-                        'returned' => 'Serial Number ini masih terhubung dengan transaksi lain yang belum dikembalikan.',
+                        'returned' => 'This serial number is still assigned to another transaction that has not been returned.',
                     ]);
                 }
 
                 $serial->status = 'available';
                 $serial->save();
 
-                // Stok mengikuti jumlah SN yang benar-benar tersedia.
-                $item->available = \App\Models\ItemSerialNumber::where(
-                    'item_id',
-                    $item->id
-                )
-                    ->where('status', 'available')
-                    ->count();
-            } else {
-                // Item tanpa SN: tambah stok satu kali.
-                $item->available = (int) $item->available + 1;
             }
 
-            if ($item->status !== 'maintenance') {
-                $item->status = $item->available > 0
-                    ? 'tersedia'
-                    : 'dipinjam';
-            }
-
-            $item->save();
+            $item->syncInventoryAvailability();
         });
 
         return back()->with(

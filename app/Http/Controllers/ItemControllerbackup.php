@@ -48,7 +48,7 @@ class ItemController extends Controller
 public function update(Request $request, Item $item)
 {
     return response()->json([
-        'TEST' => 'UPDATE TERPANGGIL',
+        'TEST' => 'UPDATE TRIGGERED',
         'item_id' => $item->id,
         'available' => $request->available,
     ]);

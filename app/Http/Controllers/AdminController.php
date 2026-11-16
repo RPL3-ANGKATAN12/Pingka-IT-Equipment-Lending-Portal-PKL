@@ -90,6 +90,8 @@ class AdminController extends Controller
                 );
             }
 
+            $item->syncInventoryAvailability();
+
             if ($item->status === 'maintenance' || $item->available <= 0) {
                 return back()->with(
                     'error',
@@ -112,14 +114,7 @@ class AdminController extends Controller
             ]);
 
             $lockedRequest->update(['status' => 'approved']);
-
-            $item->available--;
-            if ($item->status !== 'maintenance') {
-                $item->status = $item->available > 0
-                    ? 'tersedia'
-                    : 'dipinjam';
-            }
-            $item->save();
+            $item->syncInventoryAvailability();
 
             return back()->with(
                 'success',
@@ -188,6 +183,10 @@ class AdminController extends Controller
             foreach ($pendingRequests as $request) {
                 $item = $items->get($request->item_id);
 
+                if ($item) {
+                    $item->syncInventoryAvailability();
+                }
+
                 if (!$item || $item->status === 'maintenance' || $item->available <= 0) {
                     $skipped++;
                     continue;
@@ -208,11 +207,7 @@ class AdminController extends Controller
                 ]);
 
                 $request->update(['status' => 'approved']);
-                $item->available--;
-                $item->status = $item->available > 0
-                    ? 'tersedia'
-                    : 'dipinjam';
-                $item->save();
+                $item->syncInventoryAvailability();
                 $processed++;
             }
 
@@ -338,7 +333,7 @@ class AdminController extends Controller
 
                 if ($usesSerialNumbers && $sn === '') {
                     throw new \RuntimeException(
-                        'Serial Number wajib diisi untuk barang ini.'
+                        'A Serial Number is required for this item.'
                     );
                 }
 
@@ -350,7 +345,7 @@ class AdminController extends Controller
 
                     if (!$serial) {
                         throw new \RuntimeException(
-                            'Serial Number tidak terdaftar pada barang ini.'
+                            'This Serial Number is not registered to this item.'
                         );
                     }
 
@@ -360,11 +355,11 @@ class AdminController extends Controller
 
                     if ($usesHostname && $hostname === '') {
                         throw new \RuntimeException(
-                            'Hostname wajib diisi untuk barang ini.'
+                            'A hostname is required for this item.'
                         );
                     }
 
-                    // Jika SN sudah dipakai oleh peminjaman lain, tolak.
+                    // Reject the serial number if another loan is already using it.
                     $serialUsedByAnotherLoan = Loans::where('item_id', $item->id)
                         ->where('sn', $sn)
                         ->where('id', '!=', $loan->id)
@@ -374,22 +369,22 @@ class AdminController extends Controller
 
                     if ($serialUsedByAnotherLoan) {
                         throw new \RuntimeException(
-                            'Serial Number ini sudah dialokasikan ke peminjaman lain.'
+                            'This Serial Number is already assigned to another loan.'
                         );
                     }
 
-                    // SN berstatus borrowed tidak boleh dipakai ulang,
-                    // kecuali memang masih terikat pada transaksi ini.
+                    // A borrowed serial number cannot be reused unless it is
+                    // still assigned to this loan.
                     if (
                         $serial->status !== 'available' &&
                         $loan->sn !== $sn
                     ) {
                         throw new \RuntimeException(
-                            'Serial Number ini tidak tersedia.'
+                            'This Serial Number is unavailable.'
                         );
                     }
 
-                    // Lepaskan SN lama milik transaksi ini jika diganti.
+                    // Release this loan's previous serial number if it changed.
                     if (
                         filled($loan->sn) &&
                         $loan->sn !== $sn
@@ -406,7 +401,7 @@ class AdminController extends Controller
 
                     if ($usesHostname && $hostname === '') {
                         throw new \RuntimeException(
-                            'Hostname wajib diisi untuk barang ini.'
+                            'A hostname is required for this item.'
                         );
                     }
                 }
@@ -420,20 +415,7 @@ class AdminController extends Controller
                 $loan->status = 'selesai';
                 $loan->save();
 
-                // Hitung ulang stok berdasarkan SN yang tersedia.
-                if ($usesSerialNumbers) {
-                    $item->available = ItemSerialNumber::where('item_id', $item->id)
-                        ->where('status', 'available')
-                        ->count();
-
-                    if ($item->status !== 'maintenance') {
-                        $item->status = $item->available > 0
-                            ? 'tersedia'
-                            : 'dipinjam';
-                    }
-
-                    $item->save();
-                }
+                $item->syncInventoryAvailability();
             });
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
@@ -472,7 +454,7 @@ class AdminController extends Controller
 
                 if ($oldStatus === $newStatus) {
                     throw new \RuntimeException(
-                        "Loan status is already {$newStatus}."
+                        'The loan already has the selected status.'
                     );
                 }
 
@@ -495,6 +477,8 @@ class AdminController extends Controller
                 if (!$item) {
                     throw new \RuntimeException('Item not found.');
                 }
+
+                $item->syncInventoryAvailability();
 
                 $usesSerialNumbers = (bool) $item->tracks_serial_numbers;
 
@@ -561,7 +545,7 @@ class AdminController extends Controller
                     }
                 }
 
-                // Sinkronkan jumlah stok dengan SN yang benar-benar tersedia.
+                // Keep stock in sync with the number of serial numbers actually available.
                 if ($usesSerialNumbers) {
                     $item->available = ItemSerialNumber::where('item_id', $item->id)
                         ->where('status', 'available')
@@ -575,6 +559,7 @@ class AdminController extends Controller
                 $item->save();
 
                 $loan->update(['status' => $newStatus]);
+                $item->syncInventoryAvailability();
             });
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());

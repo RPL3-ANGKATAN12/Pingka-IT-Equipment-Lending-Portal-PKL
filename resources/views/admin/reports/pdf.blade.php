@@ -55,7 +55,14 @@
                     <td>{{ $loan->start_date?->format('d/m/Y') ?? '-' }}</td>
                     <td>{{ $loan->due_date?->format('d/m/Y') ?? '-' }}</td>
                     <td>{{ $loan->returned_at?->format('d/m/Y') ?? '-' }}</td>
-                    <td>{{ $loan->returned_at ? 'Completed' : ucfirst($loan->status) }}</td>
+                    <td>{{ $loan->returned_at ? 'Completed' : ([
+                        'pending' => 'Pending',
+                        'process' => 'Process',
+                        'selesai' => 'Ready for Pickup',
+                        'borrowed' => 'Borrowed',
+                        'completed' => 'Completed',
+                        'ditolak' => 'Rejected',
+                    ][$loan->status] ?? ucfirst($loan->status)) }}</td>
                 </tr>
             @empty
                 <tr>

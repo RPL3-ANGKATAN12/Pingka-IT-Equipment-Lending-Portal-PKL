@@ -47,56 +47,34 @@
     <div class="item-grid" id="itemGrid">
         @forelse($items as $item)
             @php
+                $activeLoanSerials = $item->loans
+                    ->pluck('sn')
+                    ->filter(fn ($sn) => filled($sn))
+                    ->map(fn ($sn) => mb_strtolower(trim($sn)))
+                    ->all();
                 $serialNumbers = $item->serialNumbers
-                    ->map(fn ($serial) => [
-                        'id' => $serial->id,
-                        'serial_number' => $serial->serial_number,
-                        'hostname' => $serial->hostname,
-                        'status' => $serial->status,
-                    ])
-                    ->values();
+                    ->map(function ($serial) use ($activeLoanSerials) {
+                        $isBorrowed = $serial->status === 'borrowed'
+                            || in_array(
+                                mb_strtolower(trim($serial->serial_number)),
+                                $activeLoanSerials,
+                                true
+                            );
 
-                if ($item->tracks_serial_numbers) {
-                    $activeLoanSerials = \App\Models\Loans::whereIn('status', ['process', 'selesai', 'borrowed'])
-                        ->whereNull('returned_at')
-                        ->whereNotNull('sn')
-                        ->pluck('sn')
-                        ->map(fn ($sn) => mb_strtolower(trim($sn)))
-                        ->all();
-
-                    $serialNumbers = $item->serialNumbers
-                        ->map(fn ($serial) => [
+                        return [
                             'id' => $serial->id,
                             'serial_number' => $serial->serial_number,
                             'hostname' => $serial->hostname,
-                            'status' => (
-                                $serial->status === 'borrowed'
-                                || in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true)
-                            ) ? 'borrowed' : $serial->status,
-                        ])
-                        ->values();
-
-                    $borrowed = $item->serialNumbers->filter(fn ($serial) =>
-                        $serial->status === 'borrowed'
-                        || in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true)
-                    )->count();
-
-                    $available = $item->serialNumbers->filter(fn ($serial) =>
-                        $serial->status === 'available'
-                        && !in_array(mb_strtolower(trim($serial->serial_number)), $activeLoanSerials, true)
-                    )->count();
-
-                    $totalStock = (int) ($item->target_stock ?? $item->serialNumbers->count());
-                    $unregisteredStock = max(0, $totalStock - $item->serialNumbers->count());
-                } else {
-                    $available = (int) ($item->available ?? 0);
-                    $borrowed = $item->loans()
-                        ->whereIn('status', ['process', 'selesai', 'borrowed'])
-                        ->whereNull('returned_at')
-                        ->count();
-                    $totalStock = (int) ($item->target_stock ?? ($available + $borrowed));
-                    $unregisteredStock = 0;
-                }
+                            'status' => $isBorrowed ? 'borrowed' : $serial->status,
+                        ];
+                    })
+                    ->values();
+                $borrowed = (int) $item->in_use_count;
+                $available = (int) $item->available;
+                $totalStock = (int) ($item->target_stock ?? ($available + $borrowed));
+                $unregisteredStock = $item->tracks_serial_numbers
+                    ? max(0, $totalStock - $item->serialNumbers->count())
+                    : 0;
             @endphp
 
             <article
@@ -181,7 +159,7 @@
                     </button>
                 </div>
 
-                {{-- DATA UNTUK EDIT MODAL --}}
+                {{-- DATA FOR THE EDIT MODAL --}}
                 <div class="item-actions-data" hidden>
                     <button
                         type="button"

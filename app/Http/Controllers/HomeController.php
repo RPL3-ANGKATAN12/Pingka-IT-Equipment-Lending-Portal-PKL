@@ -19,10 +19,10 @@ class HomeController extends Controller
             ->latest()
             ->get();
 
-        $dataPeminjaman = collect();
+        $loanData = collect();
 
         foreach ($pendingRequests as $request) {
-            $dataPeminjaman->push((object) [
+            $loanData->push((object) [
                 'id' => 'request-' . $request->id,
                 'name' => $request->name,
                 'departement' => $request->departement,
@@ -41,7 +41,7 @@ class HomeController extends Controller
         }
 
         foreach ($loans as $loan) {
-            $dataPeminjaman->push((object) [
+            $loanData->push((object) [
                 'id' => 'loan-' . $loan->id,
                 'name' => $loan->name,
                 'departement' => $loan->departement,
@@ -59,7 +59,7 @@ class HomeController extends Controller
             ]);
         }
 
-        $dataPeminjaman = $dataPeminjaman
+        $loanData = $loanData
             ->sortByDesc(function ($data) {
                 return $data->created_at;
             })
@@ -68,7 +68,7 @@ class HomeController extends Controller
         $items = Item::orderBy('name')->get();
 
         return view('guest.home', [
-            'loans' => $dataPeminjaman,
+            'loans' => $loanData,
             'items' => $items,
         ]);
     }
